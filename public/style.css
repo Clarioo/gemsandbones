@@ -272,6 +272,109 @@ h1 {
 .mini-btn:disabled { opacity: 0.4; cursor: default; }
 .pill.warn { color: #e0913a; }
 
+/* ---- Duel ---- */
+.duel-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.duel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+.duel-head h2 { margin: 0; font-size: 1.2rem; }
+
+.duel-player {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--panel);
+  margin: 8px 0;
+}
+.duel-player.oppo { border-color: #d9534f55; }
+.duel-player.you { border-color: #5865f255; }
+.dp-head { font-weight: 600; margin-bottom: 6px; }
+.dp-meta, .dp-stats, .dp-status {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.dp-status { color: var(--text); }
+
+.hpbar {
+  height: 10px;
+  background: var(--panel-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.hpbar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #d9534f, #e0913a);
+  transition: width 0.4s ease;
+}
+.duel-player.you .hpbar > div { background: linear-gradient(90deg, #46c6c6, #55c98a); }
+
+#duel-log {
+  height: auto;
+  min-height: 0;
+  max-height: 240px;
+  margin: 10px 0;
+}
+#duel-log:empty { display: none; }
+
+.duel-action { margin-top: 12px; }
+.duel-action h3 { margin: 0 0 10px; }
+
+.hand,
+.plan-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.duel-card,
+.plan-slot {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 120px;
+}
+button.duel-card:hover:not(:disabled),
+.plan-slot:hover { border-color: var(--accent); }
+.duel-card:disabled { opacity: 0.35; cursor: default; }
+.dc-name { font-weight: 600; font-size: 0.9rem; }
+.dc-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.dc-sub { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+.plan-slot { min-width: 140px; font-size: 0.85rem; color: var(--muted); }
+.plan-slot[data-type] { color: var(--text); }
+
+.duel-card[data-type='specialBlock'],
+.plan-slot[data-type='specialBlock']     { border-left-color: #b57bff; }
+.duel-card[data-type='special'],
+.plan-slot[data-type='special']          { border-left-color: #7b8dff; }
+.duel-card[data-type='bonus'],
+.plan-slot[data-type='bonus']            { border-left-color: #55c98a; }
+.duel-card[data-type='defensive'],
+.plan-slot[data-type='defensive']        { border-left-color: #46c6c6; }
+.duel-card[data-type='elementalAttack'],
+.plan-slot[data-type='elementalAttack']  { border-left-color: #e0913a; }
+.duel-card[data-type='physicalAttack'],
+.plan-slot[data-type='physicalAttack']   { border-left-color: #d9534f; }
+
 .chat-form { display: flex; gap: 8px; }
 .chat-form input {
   flex: 1;

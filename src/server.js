@@ -27,6 +27,7 @@ const {
   validateDeck,
   defaultDeckForClass,
 } = require('./deck');
+const { createDuelHub } = require('./duelHub');
 
 const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
 
@@ -272,6 +273,8 @@ function toPublicCharacter(c) {
 // ---------------------------------------------------------------------------
 io.engine.use(sessionMiddleware);
 
+const duelHub = createDuelHub(io, { getUserById });
+
 io.on('connection', (socket) => {
   const session = socket.request.session;
   const user = session && session.userId && getUserById(session.userId);
@@ -290,6 +293,8 @@ io.on('connection', (socket) => {
   socket.broadcast.emit('system', `${shownName} joined the lobby`);
   broadcastPlayerCount();
 
+  duelHub.onConnection(socket, user);
+
   socket.on('chat', (text) => {
     if (typeof text !== 'string') return;
     const clean = text.trim().slice(0, 500);
@@ -303,6 +308,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    duelHub.onDisconnect(user.id);
     socket.broadcast.emit('system', `${shownName} left the lobby`);
     broadcastPlayerCount();
   });

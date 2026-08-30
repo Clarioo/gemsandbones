@@ -30,6 +30,18 @@ const deckListEl = document.getElementById('deck-list');
 const poolListEl = document.getElementById('pool-list');
 const deckResetBtn = document.getElementById('deck-reset');
 
+const findDuelBtn = document.getElementById('find-duel');
+const duelSearchEl = document.getElementById('duel-search');
+const cancelSearchBtn = document.getElementById('cancel-search');
+const duelCtaNote = document.getElementById('duel-cta-note');
+const duelView = document.getElementById('duel-view');
+const duelRoundEl = document.getElementById('duel-round');
+const duelLeaveBtn = document.getElementById('duel-leave');
+const duelOppoEl = document.getElementById('duel-oppo');
+const duelYouEl = document.getElementById('duel-you');
+const duelLogEl = document.getElementById('duel-log');
+const duelActionEl = document.getElementById('duel-action');
+
 let currentUser = null;
 let statDefs = null; // { groups: [...] }, fetched once
 
@@ -56,7 +68,7 @@ async function init() {
 }
 
 function showOnly(view) {
-  for (const v of [loginView, setupView, appView]) v.hidden = v !== view;
+  for (const v of [loginView, setupView, appView, duelView]) v.hidden = v !== view;
 }
 
 function showLogin() {
@@ -145,15 +157,20 @@ function selectTab(name) {
 }
 
 // ---- Deck ---------------------------------------------------------------
-async function loadDeck() {
-  const [cat, types, dj] = await Promise.all([
+async function ensureCatalog() {
+  if (cardCatalog) return;
+  const [cat, types] = await Promise.all([
     fetch('/api/cards').then((r) => r.json()),
     fetch('/api/cards/types').then((r) => r.json()),
-    fetch('/api/deck').then((r) => (r.ok ? r.json() : { deck: [] })),
   ]);
   cardCatalog = new Map(cat.cards.map((c) => [c.id, c]));
   cardTypes = types.types;
   deckLimits = cat.limits;
+}
+
+async function loadDeck() {
+  await ensureCatalog();
+  const dj = await fetch('/api/deck').then((r) => (r.ok ? r.json() : { deck: [] }));
   deck = dj.deck || [];
   renderDeck();
 }
@@ -414,5 +431,305 @@ logoutBtn.addEventListener('click', async () => {
   socket.disconnect();
   location.reload();
 });
+
+// ---- Duel ---------------------------------------------------------------
+let duelState = null;
+let planSlots = [null, null, null, null, null];
+
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+const typeName = (id) => {
+  const t = cardTypes && cardTypes.find((x) => x.id === id);
+  return t ? t.name : id;
+};
+const handOrder = (ids) =>
+  [...new Set(ids)].sort((a, b) => {
+    const ca = cardCatalog.get(a);
+    const cb = cardCatalog.get(b);
+    return priorityOf(cb) - priorityOf(ca) || ca.name.localeCompare(cb.name);
+  });
+
+function duelErrorText(error) {
+  const map = {
+    deck_not_duel_legal: `Your deck needs at least ${deckLimits ? deckLimits.min : 15} cards to duel. Edit it on the Deck tab.`,
+    no_class: 'Pick a class first.',
+    already_in_duel: 'You are already in a duel.',
+  };
+  return map[error] || `Duel error: ${error}`;
+}
+
+findDuelBtn.addEventListener('click', () => {
+  ensureCatalog().catch(() => {});
+  duelCtaNote.textContent = '';
+  socket.emit('duel:find');
+});
+
+cancelSearchBtn.addEventListener('click', () => {
+  socket.emit('duel:cancel');
+  duelSearchEl.hidden = true;
+  findDuelBtn.hidden = false;
+});
+
+duelLeaveBtn.addEventListener('click', () => {
+  if (duelState && duelState.phase !== 'ended' &&
+      !confirm('Leave the duel? It counts as a loss.')) return;
+  socket.emit('duel:leave');
+  backToLobby();
+});
+
+function backToLobby() {
+  duelState = null;
+  showOnly(appView);
+  selectTab('lobby');
+}
+
+socket.on('duel:searching', () => {
+  findDuelBtn.hidden = true;
+  duelSearchEl.hidden = false;
+  duelCtaNote.textContent = '';
+});
+
+socket.on('duel:start', async ({ view }) => {
+  await ensureCatalog();
+  duelState = view;
+  planSlots = [null, null, null, null, null];
+  duelSearchEl.hidden = true;
+  findDuelBtn.hidden = false;
+  showOnly(duelView);
+  renderDuel();
+});
+
+socket.on('duel:update', ({ view }) => {
+  duelState = view;
+  renderDuel();
+});
+socket.on('duel:round', ({ view }) => {
+  duelState = view;
+  renderDuel();
+});
+socket.on('duel:end', ({ view }) => {
+  duelState = view;
+  renderDuel();
+});
+socket.on('duel:error', ({ error }) => {
+  duelSearchEl.hidden = true;
+  findDuelBtn.hidden = false;
+  duelCtaNote.textContent = duelErrorText(error);
+});
+
+function hpBar(hp, max) {
+  const bar = document.createElement('div');
+  bar.className = 'hpbar';
+  const fill = document.createElement('div');
+  fill.style.width = `${Math.max(0, Math.min(100, (hp / max) * 100))}%`;
+  bar.appendChild(fill);
+  return bar;
+}
+
+function renderPlayerPanel(el, p, isYou, stats) {
+  el.replaceChildren();
+  const head = document.createElement('div');
+  head.className = 'dp-head';
+  head.textContent = `${p.name} — ${cap(p.classId)} · Lvl ${p.level}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'dp-meta';
+  meta.textContent = `HP ${Math.max(0, p.hp)}/${p.maxHp} · Mana ${p.mana} · Deck ${p.deckCount} · Burned ${p.burnedCount}`;
+
+  el.append(head, hpBar(p.hp, p.maxHp), meta);
+
+  if (isYou && stats) {
+    const s = document.createElement('div');
+    s.className = 'dp-stats';
+    s.textContent =
+      `Atk ${stats.attackMin}-${stats.attackMax} · Def ${stats.defense} · ` +
+      `Fire ${stats.fireAtkMin}-${stats.fireAtkMax} · ` +
+      `Water ${stats.waterAtkMin}-${stats.waterAtkMax} · ` +
+      `Elec ${stats.electricAtkMin}-${stats.electricAtkMax}`;
+    el.append(s);
+  }
+  if (!isYou) {
+    const st = document.createElement('div');
+    st.className = 'dp-status';
+    st.textContent =
+      duelState.phase === 'ended' ? '' : p.submitted ? 'Ready ✓' : 'Choosing…';
+    el.append(st);
+  }
+}
+
+function duelCard(cardId, { onClick, disabled, sub } = {}) {
+  const card = cardCatalog.get(cardId);
+  const el = document.createElement(onClick ? 'button' : 'div');
+  el.className = 'duel-card';
+  if (card) el.dataset.type = card.type;
+  if (onClick) {
+    el.type = 'button';
+    el.disabled = !!disabled;
+    el.addEventListener('click', onClick);
+  }
+  const n = document.createElement('div');
+  n.className = 'dc-name';
+  n.textContent = card ? card.name : cardId;
+  const m = document.createElement('div');
+  m.className = 'dc-meta';
+  m.textContent = card ? `${typeName(card.type)} · ${card.manaCost} MP` : '';
+  el.append(n, m);
+  if (sub) {
+    const s = document.createElement('div');
+    s.className = 'dc-sub';
+    s.textContent = sub;
+    el.append(s);
+  }
+  return el;
+}
+
+function note(text) {
+  const p = document.createElement('p');
+  p.className = 'hint';
+  p.textContent = text;
+  return p;
+}
+
+function renderDuel() {
+  const v = duelState;
+  if (!v) return;
+  duelRoundEl.textContent =
+    v.phase === 'ended' ? 'Duel over' : `Round ${v.round} / ${v.totalRounds}`;
+
+  renderPlayerPanel(duelOppoEl, v.opponent, false);
+  renderPlayerPanel(duelYouEl, v.you, true, v.you.stats);
+
+  duelLogEl.replaceChildren();
+  for (const r of v.log) {
+    const h = document.createElement('li');
+    h.className = 'system';
+    h.textContent = `— Round ${r.round} —`;
+    duelLogEl.append(h);
+    for (const line of r.entries) {
+      const li = document.createElement('li');
+      li.textContent = line;
+      duelLogEl.append(li);
+    }
+  }
+  duelLogEl.scrollTop = duelLogEl.scrollHeight;
+
+  renderAction();
+}
+
+function renderAction() {
+  const v = duelState;
+  duelActionEl.replaceChildren();
+
+  if (v.phase === 'ended') {
+    let result = 'Draw.';
+    if (v.winner === v.you.userId) result = 'You win!';
+    else if (v.winner && v.winner !== 'draw') result = 'You lose.';
+    const reason = { hp: '', left: ' (opponent left)', rounds: ' (by HP after 15 rounds)' }[v.endReason] || '';
+    const h = document.createElement('h3');
+    h.textContent = result + reason;
+    const back = document.createElement('button');
+    back.className = 'btn discord';
+    back.textContent = 'Back to lobby';
+    back.addEventListener('click', backToLobby);
+    duelActionEl.append(h, back);
+    return;
+  }
+
+  if (v.you.submitted) {
+    duelActionEl.append(note('Waiting for opponent…'));
+    return;
+  }
+
+  // opening 5-card plan
+  if (v.round === 1 && Object.keys(v.you.plan).length === 0) {
+    renderPlanBuilder();
+    return;
+  }
+
+  // queue one card for the far slot (rounds 6..15)
+  if (v.slotToFill !== null) {
+    duelActionEl.append(note(`Choose your card for round ${v.slotToFill}`));
+    const hand = document.createElement('div');
+    hand.className = 'hand';
+    for (const id of handOrder(v.you.hand)) {
+      const count = v.you.hand.filter((x) => x === id).length;
+      hand.append(
+        duelCard(id, {
+          onClick: () => socket.emit('duel:card', { round: v.slotToFill, cardId: id }),
+          sub: count > 1 ? `×${count}` : '',
+        }),
+      );
+    }
+    if (!v.you.hand.length) hand.append(note('No cards left in hand.'));
+    duelActionEl.append(hand);
+    return;
+  }
+
+  // rounds 11-15: nothing to plan
+  const cont = document.createElement('button');
+  cont.className = 'btn discord';
+  cont.textContent = 'Continue';
+  cont.addEventListener('click', () => socket.emit('duel:ready'));
+  duelActionEl.append(note('Nothing to plan this round.'), cont);
+}
+
+function renderPlanBuilder() {
+  const v = duelState;
+  const wrap = document.createElement('div');
+  wrap.className = 'plan-builder';
+
+  const slots = document.createElement('div');
+  slots.className = 'plan-slots';
+  planSlots.forEach((cardId, i) => {
+    const slot = document.createElement('button');
+    slot.type = 'button';
+    slot.className = 'plan-slot';
+    if (cardId) {
+      slot.dataset.type = cardCatalog.get(cardId).type;
+      slot.textContent = `R${i + 1}: ${cardCatalog.get(cardId).name}`;
+    } else {
+      slot.textContent = `Round ${i + 1}`;
+    }
+    slot.addEventListener('click', () => {
+      planSlots[i] = null;
+      renderAction();
+    });
+    slots.append(slot);
+  });
+
+  const used = tally(planSlots.filter(Boolean));
+  const hand = document.createElement('div');
+  hand.className = 'hand';
+  for (const id of handOrder(v.you.hand)) {
+    const have = v.you.hand.filter((x) => x === id).length;
+    const left = have - (used.get(id) || 0);
+    hand.append(
+      duelCard(id, {
+        onClick: () => {
+          const idx = planSlots.indexOf(null);
+          if (idx !== -1 && left > 0) {
+            planSlots[idx] = id;
+            renderAction();
+          }
+        },
+        disabled: left <= 0,
+        sub: `${left} left`,
+      }),
+    );
+  }
+
+  const lock = document.createElement('button');
+  lock.className = 'btn discord';
+  lock.textContent = 'Lock in plan';
+  lock.disabled = planSlots.some((x) => !x);
+  lock.addEventListener('click', () => socket.emit('duel:plan', { cards: planSlots }));
+
+  wrap.append(
+    note('Plan your first 5 rounds. Your opponent will not see them. Click a card to place it, click a slot to clear it.'),
+    slots,
+    hand,
+    lock,
+  );
+  duelActionEl.append(wrap);
+}
 
 init();

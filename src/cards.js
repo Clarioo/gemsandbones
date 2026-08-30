@@ -41,7 +41,7 @@ const CARD_TYPE_IDS = CARD_TYPES.map((t) => t.id);
  * have several. The duel engine will read these; nothing executes them yet.
  * Intended kinds (to be finalised later):
  *
- *   { kind: 'damage',      element: 'physical'|'fire'|'water'|'electric', scale: {...} }
+ *   { kind: 'damage',      element: 'physical'|'fire'|'water'|'electric', scale: <number> }
  *   { kind: 'mitigate',    percent?: number, flat?: number }
  *   { kind: 'modifyStat',  stat: <statId>, amount: number,
  *                          target: 'self'|'opponent', duration: 'round'|'duel' }
@@ -62,7 +62,7 @@ const CARDS = [
     classes: 'all',
     graphic: '/cards/strike.png',
     description: 'A basic melee hit. Deals physical damage scaled by your attack.',
-    behaviour: [{ kind: 'damage', element: 'physical', scale: { attack: 1 } }],
+    behaviour: [{ kind: 'damage', element: 'physical', scale: 1 }],
   },
   {
     id: 'heavy-blow',
@@ -72,7 +72,7 @@ const CARDS = [
     classes: ['fencer', 'protector'],
     graphic: '/cards/heavy-blow.png',
     description: 'A committed swing for heavy physical damage.',
-    behaviour: [{ kind: 'damage', element: 'physical', scale: { attack: 1.5 } }],
+    behaviour: [{ kind: 'damage', element: 'physical', scale: 1.5 }],
   },
 
   // ---- Elemental Attack ------------------------------------------------
@@ -84,7 +84,7 @@ const CARDS = [
     classes: ['mage', 'hunter'],
     graphic: '/cards/firebolt.png',
     description: 'Hurls a bolt of fire. Damage scales with fire attack.',
-    behaviour: [{ kind: 'damage', element: 'fire', scale: { fireAtk: 1 } }],
+    behaviour: [{ kind: 'damage', element: 'fire', scale: 1 }],
   },
   {
     id: 'spark',
@@ -94,7 +94,7 @@ const CARDS = [
     classes: ['mage'],
     graphic: '/cards/spark.png',
     description: 'A quick jolt of electric damage.',
-    behaviour: [{ kind: 'damage', element: 'electric', scale: { electricAtk: 1 } }],
+    behaviour: [{ kind: 'damage', element: 'electric', scale: 1 }],
   },
 
   // ---- Defensive ------------------------------------------------------
@@ -168,7 +168,7 @@ const CARDS = [
     description: 'Surge ahead in priority this round, then unleash electric damage.',
     behaviour: [
       { kind: 'adjustPriority', amount: 15, target: 'self' },
-      { kind: 'damage', element: 'electric', scale: { electricAtk: 0.8 } },
+      { kind: 'damage', element: 'electric', scale: 0.8 },
     ],
   },
 
