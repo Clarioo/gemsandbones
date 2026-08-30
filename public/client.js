@@ -594,6 +594,12 @@ function duelCard(cardId, { onClick, disabled, sub } = {}) {
   m.className = 'dc-meta';
   m.textContent = card ? `${typeName(card.type)} · ${card.manaCost} MP` : '';
   el.append(n, m);
+  if (card && card.description) {
+    const d = document.createElement('p');
+    d.className = 'dc-desc';
+    d.textContent = card.description;
+    el.append(d);
+  }
   if (sub) {
     const s = document.createElement('div');
     s.className = 'dc-sub';
@@ -706,8 +712,10 @@ function renderPlanBuilder() {
     slot.type = 'button';
     slot.className = 'plan-slot';
     if (cardId) {
-      slot.dataset.type = cardCatalog.get(cardId).type;
-      slot.textContent = `R${i + 1}: ${cardCatalog.get(cardId).name}`;
+      const c = cardCatalog.get(cardId);
+      slot.dataset.type = c.type;
+      slot.textContent = `R${i + 1}: ${c.name}`;
+      slot.title = `${c.name} — ${typeName(c.type)}, ${c.manaCost} MP\n${c.description}`;
     } else {
       slot.textContent = `Round ${i + 1}`;
     }
