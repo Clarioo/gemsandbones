@@ -9,6 +9,9 @@ const appView = document.getElementById('app-view');
 const setupName = document.getElementById('setup-name');
 const classGrid = document.getElementById('class-grid');
 const profileEl = document.getElementById('profile');
+const sheetTitle = document.getElementById('sheet-title');
+const levelInput = document.getElementById('level-input');
+const statGroupsEl = document.getElementById('stat-groups');
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('chat-form');
 const input = document.getElementById('chat-input');
@@ -16,6 +19,7 @@ const playerCountEl = document.getElementById('player-count');
 const logoutBtn = document.getElementById('logout-btn');
 
 let currentUser = null;
+let statDefs = null; // { groups: [...] }, fetched once
 
 async function init() {
   try {
@@ -85,7 +89,7 @@ async function chooseClass(classId) {
   }
 }
 
-function showApp(user) {
+async function showApp(user) {
   showOnly(appView);
 
   const img = document.createElement('img');
@@ -100,6 +104,61 @@ function showApp(user) {
   profileEl.replaceChildren(img, name);
 
   if (!socket.connected) socket.connect();
+
+  if (user.character) {
+    if (!statDefs) statDefs = await fetch('/api/stats/definitions').then((r) => r.json());
+    levelInput.value = user.character.level;
+    renderSheet(user.character);
+  }
+}
+
+function renderSheet(character) {
+  sheetTitle.textContent = `${character.name} — ${character.className} · Lvl ${character.level}`;
+
+  statGroupsEl.replaceChildren();
+  for (const group of statDefs.groups) {
+    const box = document.createElement('div');
+    box.className = 'stat-group';
+
+    const h = document.createElement('h3');
+    h.textContent = group.name;
+    box.appendChild(h);
+
+    const dl = document.createElement('dl');
+    for (const stat of group.stats) {
+      const dt = document.createElement('dt');
+      dt.textContent = stat.name;
+      const dd = document.createElement('dd');
+      dd.textContent = character.stats[stat.id] ?? 0;
+      dl.append(dt, dd);
+    }
+    box.appendChild(dl);
+    statGroupsEl.appendChild(box);
+  }
+}
+
+let levelTimer = null;
+levelInput.addEventListener('input', () => {
+  clearTimeout(levelTimer);
+  levelTimer = setTimeout(applyLevel, 400);
+});
+
+async function applyLevel() {
+  const level = Number(levelInput.value);
+  if (!Number.isInteger(level) || level < 1 || level > 50) return;
+  try {
+    const res = await fetch('/api/character/level', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level }),
+    });
+    if (!res.ok) return;
+    const { character } = await res.json();
+    currentUser.character = character;
+    renderSheet(character);
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function addMessage(node, cls) {

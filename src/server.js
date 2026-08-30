@@ -10,8 +10,16 @@ const expressSession = require('express-session');
 const { Server } = require('socket.io');
 
 const { getAuthorizeUrl, exchangeCode, fetchDiscordUser } = require('./discord');
-const { upsertUser, getUserById, setCharacterClass } = require('./db');
+const {
+  upsertUser,
+  getUserById,
+  setCharacterClass,
+  setCharacterLevel,
+} = require('./db');
 const { CLASSES, isValidClassId, getClass } = require('./classes');
+const { STAT_GROUPS, resolveStats } = require('./stats');
+
+const MAX_LEVEL = 50;
 
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
@@ -149,6 +157,24 @@ app.post('/api/character/class', requireAuth, (req, res) => {
   res.json({ character: toPublicCharacter(character) });
 });
 
+/** The stat categories + labels, for rendering the character sheet. */
+app.get('/api/stats/definitions', (req, res) => {
+  res.json({ groups: STAT_GROUPS });
+});
+
+/**
+ * TEMPORARY: set the character's level directly so we can see stat scaling.
+ * Replace with XP-based leveling once that exists.
+ */
+app.post('/api/character/level', requireAuth, (req, res) => {
+  const level = Math.floor(Number(req.body && req.body.level));
+  if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) {
+    return res.status(400).json({ error: 'invalid_level', min: 1, max: MAX_LEVEL });
+  }
+  const character = setCharacterLevel(req.user.id, level);
+  res.json({ character: toPublicCharacter(character) });
+});
+
 /** Only expose safe, display-oriented fields to the browser. */
 function toPublicUser(u) {
   const avatarUrl = u.avatar
@@ -167,10 +193,15 @@ function toPublicUser(u) {
 function toPublicCharacter(c) {
   if (!c || !c.classId) return null;
   const cls = getClass(c.classId);
+  const level = c.level || 1;
   return {
     name: c.name,
     classId: c.classId,
     className: cls ? cls.name : c.classId,
+    level,
+    // Base stats for now. Once items/equipment exist, pass their modifiers
+    // into resolveStats() here as itemMods.
+    stats: resolveStats({ classId: c.classId, level }),
   };
 }
 

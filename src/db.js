@@ -73,9 +73,12 @@ function ensureCharacter(user) {
     user.character = {
       name: user.globalName || user.username,
       classId: null,
+      level: 1,
       createdAt: new Date().toISOString(),
     };
   }
+  // Backfill for characters created before `level` existed.
+  if (typeof user.character.level !== 'number') user.character.level = 1;
   return user.character;
 }
 
@@ -103,9 +106,22 @@ function setCharacterName(userId, name) {
   return character;
 }
 
+/** Set the character's level. Returns the character, or null. */
+function setCharacterLevel(userId, level) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.level = level;
+  save(data);
+  return character;
+}
+
 module.exports = {
   upsertUser,
   getUserById,
   setCharacterClass,
   setCharacterName,
+  setCharacterLevel,
 };
