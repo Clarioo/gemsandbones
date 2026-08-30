@@ -10,7 +10,8 @@ const expressSession = require('express-session');
 const { Server } = require('socket.io');
 
 const { getAuthorizeUrl, exchangeCode, fetchDiscordUser } = require('./discord');
-const { upsertUser, getUserById } = require('./db');
+const { upsertUser, getUserById, setCharacterClass } = require('./db');
+const { CLASSES, isValidClassId, getClass } = require('./classes');
 
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
@@ -67,8 +68,17 @@ const sessionMiddleware = expressSession({
 });
 
 app.set('trust proxy', 1); // we sit behind nginx
+app.use(express.json());
 app.use(sessionMiddleware);
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+/** Middleware: require a logged-in user, attach it as req.user. */
+function requireAuth(req, res, next) {
+  const user = req.session.userId && getUserById(req.session.userId);
+  if (!user) return res.status(401).json({ error: 'not_authenticated' });
+  req.user = user;
+  next();
+}
 
 // ---------------------------------------------------------------------------
 // Auth routes
@@ -116,10 +126,27 @@ app.post('/auth/logout', (req, res) => {
   });
 });
 
-app.get('/api/me', (req, res) => {
-  const user = req.session.userId && getUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: 'not_authenticated' });
-  res.json({ user: toPublicUser(user) });
+app.get('/api/me', requireAuth, (req, res) => {
+  res.json({ user: toPublicUser(req.user) });
+});
+
+// ---------------------------------------------------------------------------
+// Character setup
+// ---------------------------------------------------------------------------
+
+/** The class list for the picker in the browser. */
+app.get('/api/classes', (req, res) => {
+  res.json({ classes: CLASSES });
+});
+
+/** Choose (or, for now, change) the player's class. */
+app.post('/api/character/class', requireAuth, (req, res) => {
+  const { classId } = req.body || {};
+  if (!isValidClassId(classId)) {
+    return res.status(400).json({ error: 'invalid_class' });
+  }
+  const character = setCharacterClass(req.user.id, classId);
+  res.json({ character: toPublicCharacter(character) });
 });
 
 /** Only expose safe, display-oriented fields to the browser. */
@@ -132,6 +159,18 @@ function toPublicUser(u) {
     username: u.username,
     displayName: u.globalName || u.username,
     avatarUrl,
+    character: toPublicCharacter(u.character),
+  };
+}
+
+/** null until the player has picked a class. */
+function toPublicCharacter(c) {
+  if (!c || !c.classId) return null;
+  const cls = getClass(c.classId);
+  return {
+    name: c.name,
+    classId: c.classId,
+    className: cls ? cls.name : c.classId,
   };
 }
 
@@ -151,10 +190,11 @@ io.on('connection', (socket) => {
   }
 
   const me = toPublicUser(user);
+  const shownName = me.character ? me.character.name : me.displayName;
   socket.data.user = me;
 
   socket.emit('welcome', { user: me });
-  socket.broadcast.emit('system', `${me.displayName} joined the lobby`);
+  socket.broadcast.emit('system', `${shownName} joined the lobby`);
   broadcastPlayerCount();
 
   socket.on('chat', (text) => {
@@ -162,7 +202,7 @@ io.on('connection', (socket) => {
     const clean = text.trim().slice(0, 500);
     if (!clean) return;
     io.emit('chat', {
-      from: me.displayName,
+      from: shownName,
       avatarUrl: me.avatarUrl,
       text: clean,
       at: Date.now(),
@@ -170,7 +210,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    socket.broadcast.emit('system', `${me.displayName} left the lobby`);
+    socket.broadcast.emit('system', `${shownName} left the lobby`);
     broadcastPlayerCount();
   });
 });

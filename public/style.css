@@ -85,6 +85,31 @@ h1 {
 .messages li.system { color: var(--muted); font-style: italic; }
 .messages img { vertical-align: middle; border-radius: 50%; }
 
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.class-card {
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.class-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+.class-card:disabled { opacity: 0.5; cursor: default; }
+.class-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.class-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+
 .chat-form { display: flex; gap: 8px; }
 .chat-form input {
   flex: 1;

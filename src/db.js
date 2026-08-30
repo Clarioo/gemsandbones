@@ -64,4 +64,48 @@ function getUserById(id) {
   return load().users.find((u) => u.id === id) || null;
 }
 
-module.exports = { upsertUser, getUserById };
+/**
+ * Make sure the user has a character object, seeding the name from their
+ * Discord name the first time. Returns the character (mutates `user`).
+ */
+function ensureCharacter(user) {
+  if (!user.character) {
+    user.character = {
+      name: user.globalName || user.username,
+      classId: null,
+      createdAt: new Date().toISOString(),
+    };
+  }
+  return user.character;
+}
+
+/** Set (or change) the character's class. Returns the character, or null. */
+function setCharacterClass(userId, classId) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.classId = classId;
+  save(data);
+  return character;
+}
+
+/** Rename the character. Returns the character, or null. */
+function setCharacterName(userId, name) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.name = name;
+  save(data);
+  return character;
+}
+
+module.exports = {
+  upsertUser,
+  getUserById,
+  setCharacterClass,
+  setCharacterName,
+};

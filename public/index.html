@@ -16,7 +16,13 @@
         <a class="btn discord" href="/auth/discord">Login with Discord</a>
       </section>
 
-      <!-- Shown when logged in -->
+      <!-- Shown after login, before a class is chosen -->
+      <section id="setup-view" hidden>
+        <p>Welcome, <b id="setup-name"></b>. Choose your class:</p>
+        <div id="class-grid" class="class-grid"></div>
+      </section>
+
+      <!-- Shown when logged in and set up -->
       <section id="app-view" hidden>
         <header class="topbar">
           <div id="profile" class="profile"></div>

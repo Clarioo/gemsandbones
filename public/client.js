@@ -4,7 +4,10 @@
 const socket = io({ autoConnect: false });
 
 const loginView = document.getElementById('login-view');
+const setupView = document.getElementById('setup-view');
 const appView = document.getElementById('app-view');
+const setupName = document.getElementById('setup-name');
+const classGrid = document.getElementById('class-grid');
 const profileEl = document.getElementById('profile');
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('chat-form');
@@ -12,12 +15,16 @@ const input = document.getElementById('chat-input');
 const playerCountEl = document.getElementById('player-count');
 const logoutBtn = document.getElementById('logout-btn');
 
+let currentUser = null;
+
 async function init() {
   try {
     const res = await fetch('/api/me');
     if (res.ok) {
       const { user } = await res.json();
-      showApp(user);
+      currentUser = user;
+      if (user.character && user.character.classId) showApp(user);
+      else showSetup(user);
       return;
     }
   } catch (err) {
@@ -26,14 +33,60 @@ async function init() {
   showLogin();
 }
 
+function showOnly(view) {
+  for (const v of [loginView, setupView, appView]) v.hidden = v !== view;
+}
+
 function showLogin() {
-  loginView.hidden = false;
-  appView.hidden = true;
+  showOnly(loginView);
+}
+
+async function showSetup(user) {
+  showOnly(setupView);
+  setupName.textContent = user.displayName;
+
+  const res = await fetch('/api/classes');
+  const { classes } = await res.json();
+
+  classGrid.replaceChildren();
+  for (const cls of classes) {
+    const card = document.createElement('button');
+    card.className = 'class-card';
+    card.type = 'button';
+
+    const title = document.createElement('h3');
+    title.textContent = cls.name;
+    const desc = document.createElement('p');
+    desc.textContent = cls.blurb;
+
+    card.append(title, desc);
+    card.addEventListener('click', () => chooseClass(cls.id));
+    classGrid.appendChild(card);
+  }
+}
+
+async function chooseClass(classId) {
+  for (const b of classGrid.querySelectorAll('button')) b.disabled = true;
+
+  try {
+    const res = await fetch('/api/character/class', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ classId }),
+    });
+    if (!res.ok) throw new Error('request failed');
+    const { character } = await res.json();
+    currentUser.character = character;
+    showApp(currentUser);
+  } catch (err) {
+    console.error(err);
+    for (const b of classGrid.querySelectorAll('button')) b.disabled = false;
+    alert('Could not select that class. Please try again.');
+  }
 }
 
 function showApp(user) {
-  loginView.hidden = true;
-  appView.hidden = false;
+  showOnly(appView);
 
   const img = document.createElement('img');
   img.src = user.avatarUrl;
@@ -41,10 +94,12 @@ function showApp(user) {
   img.height = 32;
   img.alt = '';
   const name = document.createElement('span');
-  name.textContent = user.displayName;
+  name.textContent = user.character
+    ? `${user.character.name} — ${user.character.className}`
+    : user.displayName;
   profileEl.replaceChildren(img, name);
 
-  socket.connect();
+  if (!socket.connected) socket.connect();
 }
 
 function addMessage(node, cls) {
@@ -57,7 +112,8 @@ function addMessage(node, cls) {
 }
 
 socket.on('welcome', ({ user }) => {
-  addMessage(`Welcome, ${user.displayName}. You're in the lobby.`, 'system');
+  const name = user.character ? user.character.name : user.displayName;
+  addMessage(`Welcome, ${name}. You're in the lobby.`, 'system');
 });
 
 socket.on('system', (text) => addMessage(text, 'system'));
