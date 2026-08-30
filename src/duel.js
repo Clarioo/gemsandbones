@@ -80,7 +80,16 @@ function createDuel(id, a, b) {
     log: [], // [{ round, entries: string[] }]
     winner: undefined, // userId | 'draw' | undefined
     endReason: undefined, // 'hp' | 'left' | 'rounds'
+    deadline: null, // epoch ms for the current planning phase (set by duelHub)
   };
+}
+
+// Planning time limits (ms). Opening 5-card plan gets longer.
+const PLAN_MS_OPENING = 3 * 60 * 1000;
+const PLAN_MS_ROUND = 1 * 60 * 1000;
+
+function planningMs(duel) {
+  return duel.round === 1 ? PLAN_MS_OPENING : PLAN_MS_ROUND;
 }
 
 const opponentId = (duel, userId) => duel.order.find((x) => x !== userId);
@@ -170,6 +179,30 @@ function bothSubmitted(duel) {
   return playersOf(duel).every((p) => p.submitted);
 }
 
+/**
+ * Called when a player's planning timer runs out: the server picks for them.
+ * Opening plan -> the first 5 cards of their deck. Otherwise -> the first card
+ * of their deck for the far slot, or just mark ready if there is nothing to do.
+ */
+function autoSubmit(duel, userId) {
+  const p = duel.players[userId];
+  if (!p || p.submitted || duel.phase !== 'planning') return;
+
+  if (duel.round === 1 && Object.keys(p.plan).length === 0) {
+    const cards = p.deck.slice(0, PLAN_AHEAD);
+    if (cards.length === PLAN_AHEAD && submitPlan(duel, userId, cards).ok) return;
+    p.submitted = true;
+    return;
+  }
+
+  const slot = slotToFill(duel);
+  if (slot !== null && !p.plan[slot] && p.deck.length) {
+    if (submitCard(duel, userId, p.deck[0]).ok) return;
+  }
+  markReady(duel, userId);
+  p.submitted = true; // force, even if there was no legal card to play
+}
+
 // ---------------------------------------------------------------------------
 // Round resolution
 // ---------------------------------------------------------------------------
@@ -256,8 +289,17 @@ function resolveRound(duel, rng = Math.random) {
     entries.push(`${p.name} plays ${card.name} (${card.type})`);
   }
 
-  // 3. resolve by base priority, highest first
-  plays.sort((x, y) => basePriorityOf(y.card) - basePriorityOf(x.card));
+  // 3. resolve by base priority, highest first.
+  //    Priority tie -> the player with higher Dexterity acts first;
+  //    still tied -> coin flip.
+  plays.sort((x, y) => {
+    const byPriority = basePriorityOf(y.card) - basePriorityOf(x.card);
+    if (byPriority !== 0) return byPriority;
+    const dx = currentStats(x.actor).dexterity;
+    const dy = currentStats(y.actor).dexterity;
+    if (dx !== dy) return dy - dx;
+    return rng() < 0.5 ? -1 : 1;
+  });
   for (const play of plays) {
     for (const beh of play.card.behaviour || []) {
       applyBehaviour(beh, play.actor, play.opponent, round, entries, rng);
@@ -335,6 +377,7 @@ function viewFor(duel, userId) {
     winner: duel.winner,
     endReason: duel.endReason,
     slotToFill: slotToFill(duel),
+    deadline: duel.deadline || null,
     you: {
       ...publicPlayer(me),
       hand: [...me.deck],
@@ -351,10 +394,14 @@ module.exports = {
   TOTAL_ROUNDS,
   PLAN_AHEAD,
   MANA_PER_ROUND,
+  PLAN_MS_OPENING,
+  PLAN_MS_ROUND,
+  planningMs,
   createDuel,
   submitPlan,
   submitCard,
   markReady,
+  autoSubmit,
   bothSubmitted,
   resolveRound,
   forfeit,

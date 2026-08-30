@@ -36,6 +36,7 @@ const cancelSearchBtn = document.getElementById('cancel-search');
 const duelCtaNote = document.getElementById('duel-cta-note');
 const duelView = document.getElementById('duel-view');
 const duelRoundEl = document.getElementById('duel-round');
+const duelTimerEl = document.getElementById('duel-timer');
 const duelLeaveBtn = document.getElementById('duel-leave');
 const duelOppoEl = document.getElementById('duel-oppo');
 const duelYouEl = document.getElementById('duel-you');
@@ -482,6 +483,26 @@ function backToLobby() {
   selectTab('lobby');
 }
 
+function tickDuelTimer() {
+  if (!duelState || duelView.hidden || duelState.phase === 'ended' || !duelState.deadline) {
+    duelTimerEl.hidden = true;
+    return;
+  }
+  const ms = duelState.deadline - Date.now();
+  duelTimerEl.hidden = false;
+  if (ms <= 0) {
+    duelTimerEl.textContent = "Time's up…";
+    duelTimerEl.classList.add('warn');
+    return;
+  }
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = String(total % 60).padStart(2, '0');
+  duelTimerEl.textContent = `${m}:${s}`;
+  duelTimerEl.classList.toggle('warn', ms < 15000);
+}
+setInterval(tickDuelTimer, 500);
+
 socket.on('duel:searching', () => {
   findDuelBtn.hidden = true;
   duelSearchEl.hidden = false;
@@ -594,6 +615,7 @@ function renderDuel() {
   if (!v) return;
   duelRoundEl.textContent =
     v.phase === 'ended' ? 'Duel over' : `Round ${v.round} / ${v.totalRounds}`;
+  tickDuelTimer();
 
   renderPlayerPanel(duelOppoEl, v.opponent, false);
   renderPlayerPanel(duelYouEl, v.you, true, v.you.stats);

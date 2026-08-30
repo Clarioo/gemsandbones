@@ -33,8 +33,44 @@ function createDuelHub(io, { getUserById }) {
   const sockets = new Map(); // userId -> socket
   const duels = new Map(); // duelId -> duel
   const userDuel = new Map(); // userId -> duelId
+  const timers = new Map(); // duelId -> timeout handle
 
   const socketOf = (userId) => sockets.get(userId);
+
+  function clearDuelTimer(duel) {
+    const h = timers.get(duel.id);
+    if (h) clearTimeout(h);
+    timers.delete(duel.id);
+    duel.deadline = null;
+  }
+
+  /** Arm the planning-phase timer; on expiry the server picks for whoever stalled. */
+  function armDuelTimer(duel) {
+    clearDuelTimer(duel);
+    if (duel.phase !== 'planning') return;
+    const ms = duelEngine.planningMs(duel);
+    duel.deadline = Date.now() + ms;
+    timers.set(
+      duel.id,
+      setTimeout(() => {
+        for (const uid of duel.order) duelEngine.autoSubmit(duel, uid);
+        resolveAndAdvance(duel, { timedOut: true });
+      }, ms),
+    );
+  }
+
+  function resolveAndAdvance(duel, extra = {}) {
+    clearDuelTimer(duel);
+    const entry = duelEngine.resolveRound(duel);
+    if (duel.phase === 'ended') {
+      sendViews(duel, 'round', () => ({ entry, ...extra }));
+      sendViews(duel, 'end');
+      cleanupDuel(duel);
+    } else {
+      armDuelTimer(duel); // set the next deadline before broadcasting
+      sendViews(duel, 'round', () => ({ entry, ...extra }));
+    }
+  }
 
   function sendViews(duel, event, perUserExtra = () => ({})) {
     for (const uid of duel.order) {
@@ -81,24 +117,21 @@ function createDuelHub(io, { getUserById }) {
       duels.set(id, duel);
       userDuel.set(aId, id);
       userDuel.set(bId, id);
+      armDuelTimer(duel);
       sendViews(duel, 'start');
     }
   }
 
   function afterSubmit(duel) {
     if (duelEngine.bothSubmitted(duel)) {
-      const entry = duelEngine.resolveRound(duel);
-      sendViews(duel, 'round', () => ({ entry }));
-      if (duel.phase === 'ended') {
-        sendViews(duel, 'end');
-        cleanupDuel(duel);
-      }
+      resolveAndAdvance(duel);
     } else {
       sendViews(duel, 'update');
     }
   }
 
   function cleanupDuel(duel) {
+    clearDuelTimer(duel);
     for (const uid of duel.order) userDuel.delete(uid);
     duels.delete(duel.id);
   }
