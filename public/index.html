@@ -31,28 +31,56 @@
           <button id="logout-btn" class="btn ghost">Log out</button>
         </header>
 
-        <section id="sheet" class="sheet">
-          <div class="sheet-head">
-            <h2 id="sheet-title">Character</h2>
-            <label class="level-control">
-              Level
-              <input id="level-input" type="number" min="1" max="50" value="1" />
-            </label>
+        <nav class="tabs">
+          <button class="tab is-active" data-tab="character">Character</button>
+          <button class="tab" data-tab="deck">Deck</button>
+          <button class="tab" data-tab="lobby">Lobby</button>
+        </nav>
+
+        <section id="tab-character" class="tab-panel">
+          <div class="sheet">
+            <div class="sheet-head">
+              <h2 id="sheet-title">Character</h2>
+              <label class="level-control">
+                Level
+                <input id="level-input" type="number" min="1" max="50" value="1" />
+              </label>
+            </div>
+            <p class="hint level-note">
+              Level can be set by hand for now so you can see the stats scale &mdash;
+              XP-based leveling comes later.
+            </p>
+            <div id="stat-groups" class="stat-groups"></div>
           </div>
-          <p class="hint level-note">
-            Level can be set by hand for now so you can see the stats scale &mdash;
-            XP-based leveling comes later.
-          </p>
-          <div id="stat-groups" class="stat-groups"></div>
         </section>
 
-        <h2>Lobby</h2>
-        <ul id="messages" class="messages"></ul>
+        <section id="tab-deck" class="tab-panel" hidden>
+          <div class="sheet">
+            <div class="sheet-head">
+              <h2>Deck <span id="deck-count" class="pill"></span></h2>
+              <button id="deck-reset" class="btn ghost">Reset to starter</button>
+            </div>
+            <p id="deck-hint" class="hint"></p>
+            <div class="deck-cols">
+              <div>
+                <h3 class="col-title">In your deck</h3>
+                <div id="deck-list" class="card-list"></div>
+              </div>
+              <div>
+                <h3 class="col-title">Card pool</h3>
+                <div id="pool-list" class="card-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <form id="chat-form" class="chat-form" autocomplete="off">
-          <input id="chat-input" type="text" placeholder="Say something to the lobby&hellip;" maxlength="500" />
-          <button type="submit" class="btn">Send</button>
-        </form>
+        <section id="tab-lobby" class="tab-panel" hidden>
+          <ul id="messages" class="messages"></ul>
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <input id="chat-input" type="text" placeholder="Say something to the lobby&hellip;" maxlength="500" />
+            <button type="submit" class="btn">Send</button>
+          </form>
+        </section>
       </section>
     </main>
 

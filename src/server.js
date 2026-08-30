@@ -15,9 +15,20 @@ const {
   getUserById,
   setCharacterClass,
   setCharacterLevel,
+  setDeck,
 } = require('./db');
 const { CLASSES, isValidClassId, getClass } = require('./classes');
 const { STAT_GROUPS, resolveStats } = require('./stats');
+const { CARD_TYPES, CARDS, getCard, cardUsableByClass } = require('./cards');
+const {
+  DECK_MIN,
+  DECK_MAX,
+  MAX_COPIES,
+  validateDeck,
+  defaultDeckForClass,
+} = require('./deck');
+
+const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
 
 const MAX_LEVEL = 50;
 
@@ -175,6 +186,56 @@ app.post('/api/character/level', requireAuth, (req, res) => {
   res.json({ character: toPublicCharacter(character) });
 });
 
+// ---------------------------------------------------------------------------
+// Cards & deck
+// ---------------------------------------------------------------------------
+
+/** Card types in priority order (highest first). */
+app.get('/api/cards/types', (req, res) => {
+  res.json({ types: CARD_TYPES });
+});
+
+/** The whole card catalog, flagged with whether this player's class can use each. */
+app.get('/api/cards', requireAuth, (req, res) => {
+  const classId = req.user.character && req.user.character.classId;
+  res.json({
+    cards: CARDS.map((c) => ({ ...c, usable: classId ? cardUsableByClass(c, classId) : false })),
+    limits: DECK_LIMITS,
+  });
+});
+
+/** This player's deck, as full card objects (in stored order). */
+app.get('/api/deck', requireAuth, (req, res) => {
+  const ch = req.user.character;
+  if (!ch || !ch.classId) return res.status(409).json({ error: 'no_class' });
+  const deck = Array.isArray(ch.deck) ? ch.deck : [];
+  res.json({
+    deck,
+    cards: deck.map(getCard).filter(Boolean),
+    limits: DECK_LIMITS,
+  });
+});
+
+/** Replace this player's deck. Body: { deck: cardId[] }. */
+app.put('/api/deck', requireAuth, (req, res) => {
+  const ch = req.user.character;
+  if (!ch || !ch.classId) return res.status(409).json({ error: 'no_class' });
+
+  const result = validateDeck(req.body && req.body.deck, ch.classId);
+  if (!result.ok) return res.status(400).json({ error: result.error, limits: DECK_LIMITS });
+
+  const character = setDeck(req.user.id, result.deck);
+  res.json({ deck: character.deck });
+});
+
+/** Replace the deck with the starter deck for the player's class. */
+app.post('/api/deck/reset', requireAuth, (req, res) => {
+  const ch = req.user.character;
+  if (!ch || !ch.classId) return res.status(409).json({ error: 'no_class' });
+  const character = setDeck(req.user.id, defaultDeckForClass(ch.classId));
+  res.json({ deck: character.deck });
+});
+
 /** Only expose safe, display-oriented fields to the browser. */
 function toPublicUser(u) {
   const avatarUrl = u.avatar
@@ -199,6 +260,7 @@ function toPublicCharacter(c) {
     classId: c.classId,
     className: cls ? cls.name : c.classId,
     level,
+    deckSize: Array.isArray(c.deck) ? c.deck.length : 0,
     // Base stats for now. Once items/equipment exist, pass their modifiers
     // into resolveStats() here as itemMods.
     stats: resolveStats({ classId: c.classId, level }),
