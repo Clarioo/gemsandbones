@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gems and Bones</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Gems &amp; Bones</h1>
+
+      <!-- Shown when logged out -->
+      <section id="login-view" hidden>
+        <p>A browser card game. Sign in with your Discord account to play.</p>
+        <a class="btn discord" href="/auth/discord">Login with Discord</a>
+      </section>
+
+      <!-- Shown when logged in -->
+      <section id="app-view" hidden>
+        <header class="topbar">
+          <div id="profile" class="profile"></div>
+          <div class="spacer"></div>
+          <span class="pill">Players online: <b id="player-count">0</b></span>
+          <button id="logout-btn" class="btn ghost">Log out</button>
+        </header>
+
+        <p class="hint">
+          This is the lobby. Login + real-time messaging work end to end &mdash;
+          the card table gets built on top of this next.
+        </p>
+
+        <ul id="messages" class="messages"></ul>
+
+        <form id="chat-form" class="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" placeholder="Say something to the lobby&hellip;" maxlength="500" />
+          <button type="submit" class="btn">Send</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/client.js"></script>
+  </body>
+</html>

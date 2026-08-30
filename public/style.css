@@ -1,0 +1,97 @@
+:root {
+  --bg: #0f1220;
+  --panel: #191d31;
+  --panel-2: #232842;
+  --text: #e8eaf5;
+  --muted: #9aa0bd;
+  --accent: #5865f2;        /* Discord blurple */
+  --accent-hover: #4752c4;
+  --border: #2c3252;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+h1 {
+  font-size: 1.8rem;
+  margin: 0 0 20px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover { background: #2b3152; }
+.btn.discord { background: var(--accent); border-color: var(--accent); }
+.btn.discord:hover { background: var(--accent-hover); }
+.btn.ghost { background: transparent; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.spacer { flex: 1; }
+.profile { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.profile img { border-radius: 50%; }
+
+.pill {
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.hint { color: var(--muted); font-size: 0.9rem; }
+
+.messages {
+  list-style: none;
+  margin: 16px 0;
+  padding: 12px;
+  height: 340px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.messages li { padding: 4px 0; }
+.messages li.system { color: var(--muted); font-style: italic; }
+.messages img { vertical-align: middle; border-radius: 50%; }
+
+.chat-form { display: flex; gap: 8px; }
+.chat-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 0.95rem;
+}
