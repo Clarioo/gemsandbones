@@ -31,11 +31,22 @@
           <button id="logout-btn" class="btn ghost">Log out</button>
         </header>
 
-        <p class="hint">
-          This is the lobby. Login + real-time messaging work end to end &mdash;
-          the card table gets built on top of this next.
-        </p>
+        <section id="sheet" class="sheet">
+          <div class="sheet-head">
+            <h2 id="sheet-title">Character</h2>
+            <label class="level-control">
+              Level
+              <input id="level-input" type="number" min="1" max="50" value="1" />
+            </label>
+          </div>
+          <p class="hint level-note">
+            Level can be set by hand for now so you can see the stats scale &mdash;
+            XP-based leveling comes later.
+          </p>
+          <div id="stat-groups" class="stat-groups"></div>
+        </section>
 
+        <h2>Lobby</h2>
         <ul id="messages" class="messages"></ul>
 
         <form id="chat-form" class="chat-form" autocomplete="off">
