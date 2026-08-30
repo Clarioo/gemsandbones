@@ -14,6 +14,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+const { deckIsLegal, defaultDeckForClass } = require('./deck');
+
 const DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
 
 function load() {
@@ -90,6 +92,26 @@ function setCharacterClass(userId, classId) {
 
   const character = ensureCharacter(user);
   character.classId = classId;
+
+  // Give a fresh character a starter deck, and reset the deck if a class change
+  // left it with cards the new class cannot use.
+  if (!Array.isArray(character.deck) || !character.deck.length ||
+      !deckIsLegal(character.deck, classId)) {
+    character.deck = defaultDeckForClass(classId);
+  }
+
+  save(data);
+  return character;
+}
+
+/** Replace the character's deck. Caller must validate first. Returns character. */
+function setDeck(userId, deck) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.deck = [...deck];
   save(data);
   return character;
 }
@@ -124,4 +146,5 @@ module.exports = {
   setCharacterClass,
   setCharacterName,
   setCharacterLevel,
+  setDeck,
 };
