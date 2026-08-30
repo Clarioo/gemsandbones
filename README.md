@@ -111,11 +111,15 @@ cd ~/gemsandbones && git pull && npm install --omit=dev && pm2 restart gemsandbo
 
 ---
 
+## Session store
+
+Set `REDIS_URL=redis://127.0.0.1:6379` in `.env` to keep sessions in Redis
+(survives restarts, works across processes). Unset, it uses a simple in-memory
+store — fine for local dev. The VPS has Redis installed, so its `.env` sets
+`REDIS_URL`.
+
 ## Known trade-offs (fix before real traffic)
 
-- **Session store is in-memory.** Everyone is logged out on every restart, and
-  it breaks with more than one process. Switch to `connect-redis` (Redis is
-  already installed on the VPS).
 - **Storage is a JSON file.** Fine for now; move to PostgreSQL or SQLite when
   you add match history / stats / a friends list.
 - **No rate limiting** on auth routes or chat. Add `express-rate-limit`.

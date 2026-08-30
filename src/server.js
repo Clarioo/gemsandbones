@@ -29,11 +29,31 @@ const io = new Server(server);
 // ---------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------
-// NOTE: the default in-memory session store is fine for development, but it
-// forgets everyone whenever the server restarts and does not work if you run
-// more than one process. On the VPS you already have Redis -- switch to
-// connect-redis before you have real players. (See README.)
+// Where logged-in sessions are stored:
+//   - REDIS_URL set   -> Redis (survives restarts, works with multiple
+//                        processes). This is what the VPS uses.
+//   - REDIS_URL unset -> in-memory (fine for local dev; forgets everyone on
+//                        restart, single process only).
+let sessionStore; // undefined => express-session falls back to MemoryStore
+
+if (process.env.REDIS_URL) {
+  const { createClient } = require('redis');
+  const { RedisStore } = require('connect-redis');
+
+  const redisClient = createClient({ url: process.env.REDIS_URL });
+  redisClient.on('error', (err) => console.error('Redis error:', err));
+  redisClient.connect().then(
+    () => console.log('Session store: Redis'),
+    (err) => console.error('Redis connection failed:', err)
+  );
+
+  sessionStore = new RedisStore({ client: redisClient, prefix: 'gnb:sess:' });
+} else {
+  console.warn('Session store: in-memory (set REDIS_URL to use Redis)');
+}
+
 const sessionMiddleware = expressSession({
+  store: sessionStore,
   name: 'gnb.sid',
   secret: process.env.SESSION_SECRET || 'dev-only-insecure-secret-change-me',
   resave: false,
