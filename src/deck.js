@@ -5,16 +5,20 @@
  *
  * A deck is a plain array of card ids; repeats mean multiple copies.
  * Limits are starting values -- tune freely.
+ *
+ * A duel plays 15 cards, one per round, with no reshuffle, so a deck must hold
+ * at least DECK_MIN cards to be duel-legal. Deckbuilding still lets you save a
+ * smaller deck (validateDeck) -- you just cannot queue for a duel with it.
  */
 
-const { CARDS, getCard, cardUsableByClass, cardsForClass } = require('./cards');
+const { getCard, cardUsableByClass, cardsForClass } = require('./cards');
 
-const DECK_MIN = 10; // advisory (client hint) -- not rejected by the server yet
-const DECK_MAX = 20; // hard limit
+const DECK_MIN = 15; // needed to start a duel
+const DECK_MAX = 25; // hard cap
 const MAX_COPIES = 3; // per distinct card
 
 /**
- * Validate a proposed deck for a class.
+ * Validate a proposed deck for a class (deckbuilding rules -- no minimum).
  * Returns { ok: true, deck } or { ok: false, error }.
  */
 function validateDeck(deck, classId) {
@@ -36,22 +40,37 @@ function validateDeck(deck, classId) {
   return { ok: true, deck: [...deck] };
 }
 
-/** Is every card in this deck still legal for the class? */
+/** Deckbuilding-legal (used to decide whether a class change resets the deck). */
 function deckIsLegal(deck, classId) {
   return Array.isArray(deck) && validateDeck(deck, classId).ok;
 }
 
+/** Deckbuilding-legal AND big enough to start a duel. */
+function isDuelLegal(deck, classId) {
+  return deckIsLegal(deck, classId) && deck.length >= DECK_MIN;
+}
+
 /**
- * A reasonable starting deck for a class: two copies of every card the class
- * can use, capped at DECK_MAX.
+ * A reasonable starting deck for a class: cycle through every card the class
+ * can use, adding copies (up to MAX_COPIES) until we reach DECK_MIN.
  */
 function defaultDeckForClass(classId) {
   const usable = cardsForClass(classId);
+  if (!usable.length) return [];
+
   const deck = [];
-  for (let copy = 0; copy < 2; copy++) {
+  const counts = new Map();
+  let progressed = true;
+  while (deck.length < DECK_MIN && progressed) {
+    progressed = false;
     for (const card of usable) {
-      if (deck.length >= DECK_MAX) return deck;
-      deck.push(card.id);
+      if (deck.length >= DECK_MIN) break;
+      const n = counts.get(card.id) || 0;
+      if (n < MAX_COPIES) {
+        counts.set(card.id, n + 1);
+        deck.push(card.id);
+        progressed = true;
+      }
     }
   }
   return deck;
@@ -63,5 +82,6 @@ module.exports = {
   MAX_COPIES,
   validateDeck,
   deckIsLegal,
+  isDuelLegal,
   defaultDeckForClass,
 };
