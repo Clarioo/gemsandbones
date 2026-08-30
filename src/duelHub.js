@@ -9,6 +9,7 @@
  *
  * Socket events in  (all prefixed `duel:`):
  *   find                     join the matchmaking queue
+ *   practice                 start a duel against a simple bot (solo testing)
  *   cancel                   leave the queue
  *   plan   { cards:[5] }      submit the opening 5-round plan
  *   card   { round, cardId }  queue the card for the far slot (rounds 6..15)
@@ -26,7 +27,9 @@
 
 const crypto = require('crypto');
 const duelEngine = require('./duel');
-const { isDuelLegal } = require('./deck');
+const duelBot = require('./duelBot');
+const { isDuelLegal, defaultDeckForClass } = require('./deck');
+const { CLASSES } = require('./classes');
 
 function createDuelHub(io, { getUserById }) {
   const queue = []; // userIds waiting
@@ -34,6 +37,7 @@ function createDuelHub(io, { getUserById }) {
   const duels = new Map(); // duelId -> duel
   const userDuel = new Map(); // userId -> duelId
   const timers = new Map(); // duelId -> timeout handle
+  const botDuels = new Map(); // duelId -> bot userId (practice duels)
 
   const socketOf = (userId) => sockets.get(userId);
 
@@ -69,7 +73,31 @@ function createDuelHub(io, { getUserById }) {
     } else {
       armDuelTimer(duel); // set the next deadline before broadcasting
       sendViews(duel, 'round', () => ({ entry, ...extra }));
+      if (botAct(duel)) sendViews(duel, 'update'); // let the bot pre-submit
     }
+  }
+
+  /**
+   * If this is a practice duel and the bot still needs to act this planning
+   * phase, make it act. Returns whether it did anything.
+   */
+  function botAct(duel) {
+    const botId = botDuels.get(duel.id);
+    if (!botId || duel.phase !== 'planning') return false;
+    const bot = duel.players[botId];
+    if (bot.submitted) return false;
+
+    if (duel.round === 1 && Object.keys(bot.plan).length === 0) {
+      duelEngine.submitPlan(duel, botId, duelBot.chooseOpeningPlan(bot));
+    } else if (duelEngine.slotToFill(duel) !== null) {
+      const cardId = duelBot.chooseCard(duel, bot);
+      if (cardId) duelEngine.submitCard(duel, botId, cardId);
+      else { duelEngine.markReady(duel, botId); bot.submitted = true; }
+    } else {
+      duelEngine.markReady(duel, botId);
+    }
+    if (!bot.submitted) duelEngine.autoSubmit(duel, botId); // failsafe
+    return true;
   }
 
   function sendViews(duel, event, perUserExtra = () => ({})) {
@@ -123,6 +151,7 @@ function createDuelHub(io, { getUserById }) {
   }
 
   function afterSubmit(duel) {
+    botAct(duel); // in a practice duel, respond to the human's submission
     if (duelEngine.bothSubmitted(duel)) {
       resolveAndAdvance(duel);
     } else {
@@ -133,6 +162,7 @@ function createDuelHub(io, { getUserById }) {
   function cleanupDuel(duel) {
     clearDuelTimer(duel);
     for (const uid of duel.order) userDuel.delete(uid);
+    botDuels.delete(duel.id);
     duels.delete(duel.id);
   }
 
@@ -169,6 +199,42 @@ function createDuelHub(io, { getUserById }) {
       if (!queue.includes(userId)) queue.push(userId);
       socket.emit('duel:searching');
       tryStartMatch();
+    });
+
+    socket.on('duel:practice', () => {
+      if (duelOf(userId)) return socket.emit('duel:error', { error: 'already_in_duel' });
+      const c = currentCharacter(userId);
+      if (!c) return socket.emit('duel:error', { error: 'no_class' });
+      if (!isDuelLegal(c.character.deck, c.character.classId)) {
+        return socket.emit('duel:error', { error: 'deck_not_duel_legal' });
+      }
+      leaveQueue(userId);
+
+      const botClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
+      const level = c.character.level || 1;
+      const human = {
+        userId,
+        name: c.character.name,
+        classId: c.character.classId,
+        level,
+        deck: [...c.character.deck],
+      };
+      const bot = {
+        userId: `bot:${crypto.randomUUID()}`,
+        name: `Training Bot (${botClass.name})`,
+        classId: botClass.id,
+        level,
+        deck: defaultDeckForClass(botClass.id),
+      };
+
+      const id = crypto.randomUUID();
+      const duel = duelEngine.createDuel(id, human, bot);
+      duels.set(id, duel);
+      userDuel.set(userId, id);
+      botDuels.set(id, bot.userId);
+      armDuelTimer(duel);
+      sendViews(duel, 'start');
+      if (botAct(duel)) sendViews(duel, 'update');
     });
 
     socket.on('duel:cancel', () => {

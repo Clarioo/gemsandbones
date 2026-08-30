@@ -31,6 +31,7 @@ const poolListEl = document.getElementById('pool-list');
 const deckResetBtn = document.getElementById('deck-reset');
 
 const findDuelBtn = document.getElementById('find-duel');
+const practiceDuelBtn = document.getElementById('practice-duel');
 const duelSearchEl = document.getElementById('duel-search');
 const cancelSearchBtn = document.getElementById('cancel-search');
 const duelCtaNote = document.getElementById('duel-cta-note');
@@ -462,6 +463,12 @@ findDuelBtn.addEventListener('click', () => {
   ensureCatalog().catch(() => {});
   duelCtaNote.textContent = '';
   socket.emit('duel:find');
+});
+
+practiceDuelBtn.addEventListener('click', () => {
+  ensureCatalog().catch(() => {});
+  duelCtaNote.textContent = '';
+  socket.emit('duel:practice');
 });
 
 cancelSearchBtn.addEventListener('click', () => {
