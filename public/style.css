@@ -254,10 +254,10 @@ h1 {
 
 /* ---- Deck ---- */
 
-/* Deck + pool side by side. On wide screens the deck editor breaks out of
-   the 720px page column (full-bleed) so each pane is wide enough to work in,
-   and the deck pane sticks so you can drag cards to/from it while scrolling
-   the pool. Below 980px the two panes stack. */
+/* Deck + pool side by side. On wide screens the deck editor breaks out of the
+   720px page column (full-bleed) and fills the viewport: each pane's header
+   (title, count, distribution, sort) stays fixed and only the card list
+   scrolls. Below 980px the two panes stack and the whole page scrolls. */
 .deck-layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -274,13 +274,26 @@ h1 {
     width: 94vw;
     max-width: 1280px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-auto-rows: 100%;
+    align-items: stretch;
+    height: var(--deck-h, calc(100vh - 288px));
+    min-height: 380px;
   }
-  .deck-pane {
-    position: sticky;
-    top: 16px;
-    align-self: start;
-    max-height: calc(100vh - 32px);
+  .deck-pane,
+  .pool-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  /* only the card list scrolls; everything above it is pinned */
+  .deck-pane > .card-groups,
+  .pool-pane > .card-groups {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    margin-right: -8px;
+    padding-right: 8px;
   }
   /* a touch tighter so each pane reliably fits 3 cards across */
   .deck-layout .card-grid {
