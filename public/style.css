@@ -254,6 +254,40 @@ h1 {
 
 /* ---- Deck ---- */
 
+/* Deck + pool side by side. On wide screens the deck editor breaks out of
+   the 720px page column (full-bleed) so each pane is wide enough to work in,
+   and the deck pane sticks so you can drag cards to/from it while scrolling
+   the pool. Below 980px the two panes stack. */
+.deck-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.deck-layout > .sheet { margin: 0; }
+
+@media (min-width: 980px) {
+  .deck-layout {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 94vw;
+    max-width: 1280px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .deck-pane {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  /* a touch tighter so each pane reliably fits 3 cards across */
+  .deck-layout .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  }
+}
+
 /* per-type distribution strip at the top of "My deck" */
 .deck-dist {
   display: flex;
