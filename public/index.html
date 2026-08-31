@@ -126,20 +126,25 @@
         <section id="tab-deck" class="tab-panel" hidden>
           <div class="sheet">
             <div class="sheet-head">
-              <h2>Deck <span id="deck-count" class="pill"></span></h2>
+              <h2>My deck <span id="deck-count" class="pill"></span></h2>
               <button id="deck-reset" class="btn ghost">Reset to starter</button>
             </div>
             <p id="deck-hint" class="hint"></p>
-            <div class="deck-cols">
-              <div>
-                <h3 class="col-title">In your deck</h3>
-                <div id="deck-list" class="card-list"></div>
-              </div>
-              <div>
-                <h3 class="col-title">Card pool</h3>
-                <div id="pool-list" class="card-list"></div>
+            <div id="deck-dist" class="deck-dist"></div>
+            <div id="deck-list" class="card-groups"></div>
+          </div>
+
+          <div class="sheet">
+            <div class="sheet-head">
+              <h2>Card pool</h2>
+              <div id="pool-sort" class="sort-ctl">
+                <span>Sort</span>
+                <button type="button" data-sort="type" class="is-active">Type</button>
+                <button type="button" data-sort="name">Name</button>
+                <button type="button" data-sort="mana">Mana</button>
               </div>
             </div>
+            <div id="pool-list" class="card-groups"></div>
           </div>
         </section>
 

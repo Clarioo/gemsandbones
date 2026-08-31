@@ -26,8 +26,10 @@ const tabPanels = {
 };
 const deckCountEl = document.getElementById('deck-count');
 const deckHintEl = document.getElementById('deck-hint');
+const deckDistEl = document.getElementById('deck-dist');
 const deckListEl = document.getElementById('deck-list');
 const poolListEl = document.getElementById('pool-list');
+const poolSortEl = document.getElementById('pool-sort');
 const deckResetBtn = document.getElementById('deck-reset');
 
 const findDuelBtn = document.getElementById('find-duel');
@@ -52,6 +54,7 @@ let cardCatalog = null; // Map<id, card + {usable}>
 let cardTypes = null;   // [{ id, name, basePriority }] highest first
 let deckLimits = null;  // { min, max, maxCopies }
 let deck = [];           // array of card ids (repeats = copies)
+let poolSort = 'type';   // 'type' | 'name' | 'mana'
 
 async function init() {
   try {
@@ -223,31 +226,91 @@ function renderDeck() {
       ? `At least ${deckLimits.min} cards needed to duel (${deckLimits.min - total} more). Up to ${deckLimits.maxCopies} copies of a card.`
       : `Up to ${deckLimits.max} cards, ${deckLimits.maxCopies} copies of a card.`;
 
-  // In the deck: distinct cards, grouped by type in priority order
-  deckListEl.replaceChildren();
-  const distinct = [...new Set(deck)];
-  for (const type of cardTypes) {
-    for (const id of distinct) {
-      const card = cardCatalog.get(id);
-      if (card && card.type === type.id) {
-        deckListEl.appendChild(gameCard(card, { controls: 'deck', count: counts.get(id) }));
-      }
-    }
+  // per-type distribution strip
+  const byType = new Map();
+  for (const [id, n] of counts) {
+    const c = cardCatalog.get(id);
+    if (c) byType.set(c.type, (byType.get(c.type) || 0) + n);
   }
-  if (!total) {
-    const p = document.createElement('p');
-    p.className = 'hint';
-    p.textContent = 'Your deck is empty.';
-    deckListEl.appendChild(p);
+  deckDistEl.replaceChildren();
+  for (const t of cardTypes) {
+    const n = byType.get(t.id) || 0;
+    const chip = document.createElement('span');
+    chip.className = n ? 'dchip' : 'dchip empty';
+    chip.style.setProperty('--c', `var(--t-${t.id})`);
+    chip.append(icon(t.id, 12), document.createTextNode(`${t.name} ${n}`));
+    chip.title = `${n} ${t.name} card${n === 1 ? '' : 's'} in your deck`;
+    deckDistEl.appendChild(chip);
   }
 
-  // Card pool: everything this class can use
+  // My deck: grouped by type (priority order), non-empty groups only
+  deckListEl.replaceChildren();
+  if (!total) {
+    const p = document.createElement('p');
+    p.className = 'empty-note';
+    p.textContent = 'Your deck is empty. Add cards from the pool below.';
+    deckListEl.appendChild(p);
+  } else {
+    for (const t of cardTypes) {
+      const ids = [...counts.keys()]
+        .filter((id) => cardCatalog.get(id) && cardCatalog.get(id).type === t.id)
+        .sort((a, b) => cardCatalog.get(a).name.localeCompare(cardCatalog.get(b).name));
+      if (!ids.length) continue;
+      const nCards = ids.reduce((s, id) => s + counts.get(id), 0);
+      const grid = document.createElement('div');
+      grid.className = 'card-grid';
+      for (const id of ids) {
+        grid.appendChild(gameCard(cardCatalog.get(id), { controls: 'deck', count: counts.get(id) }));
+      }
+      deckListEl.appendChild(typeGroup(t, cardWord(nCards), grid));
+    }
+  }
+
+  // Card pool: everything this class can use, sorted per the toggle
   poolListEl.replaceChildren();
   const pool = [...cardCatalog.values()].filter((c) => c.usable);
-  pool.sort((a, b) => priorityOf(b) - priorityOf(a) || a.name.localeCompare(b.name));
-  for (const card of pool) {
-    poolListEl.appendChild(gameCard(card, { controls: 'pool', count: counts.get(card.id) || 0 }));
+  if (poolSort === 'type') {
+    for (const t of cardTypes) {
+      const cards = pool
+        .filter((c) => c.type === t.id)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (!cards.length) continue;
+      const grid = document.createElement('div');
+      grid.className = 'card-grid';
+      for (const c of cards) {
+        grid.appendChild(gameCard(c, { controls: 'pool', count: counts.get(c.id) || 0 }));
+      }
+      poolListEl.appendChild(typeGroup(t, cardWord(cards.length), grid));
+    }
+  } else {
+    const sorted = [...pool].sort(
+      poolSort === 'mana'
+        ? (a, b) => a.manaCost - b.manaCost || a.name.localeCompare(b.name)
+        : (a, b) => a.name.localeCompare(b.name),
+    );
+    const grid = document.createElement('div');
+    grid.className = 'card-grid';
+    for (const c of sorted) {
+      grid.appendChild(gameCard(c, { controls: 'pool', count: counts.get(c.id) || 0 }));
+    }
+    poolListEl.appendChild(grid);
   }
+}
+
+const cardWord = (n) => `${n} card${n === 1 ? '' : 's'}`;
+
+function typeGroup(type, countText, gridEl) {
+  const wrap = document.createElement('div');
+  wrap.className = 'type-group';
+  wrap.dataset.type = type.id;
+  const h = document.createElement('h4');
+  h.append(icon(type.id, 15), document.createTextNode(type.name));
+  const c = document.createElement('span');
+  c.className = 'tg-count';
+  c.textContent = countText;
+  h.appendChild(c);
+  wrap.append(h, gridEl);
+  return wrap;
 }
 
 function miniButton(label, onClick) {
@@ -409,6 +472,16 @@ deckResetBtn.addEventListener('click', async () => {
     deck = (await res.json()).deck;
     renderDeck();
   }
+});
+
+poolSortEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-sort]');
+  if (!btn) return;
+  poolSort = btn.dataset.sort;
+  for (const b of poolSortEl.querySelectorAll('button')) {
+    b.classList.toggle('is-active', b === btn);
+  }
+  renderDeck();
 });
 
 const PRIMARY_STATS = ['strength', 'vitality', 'intelligence', 'dexterity'];
