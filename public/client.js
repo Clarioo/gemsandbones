@@ -159,7 +159,29 @@ function selectTab(name) {
     b.classList.toggle('is-active', b.dataset.tab === name);
   }
   for (const [key, panel] of Object.entries(tabPanels)) panel.hidden = key !== name;
+  if (name === 'deck') requestAnimationFrame(fitDeckLayout);
 }
+
+/**
+ * On wide screens the deck editor fills the viewport (fixed headers, scrolling
+ * card lists). Its height is "everything below where it starts", which we can
+ * only know once it's on screen.
+ */
+function fitDeckLayout() {
+  const layout = document.querySelector('.deck-layout');
+  if (!layout || tabPanels.deck.hidden || window.innerWidth < 980) {
+    if (layout) layout.style.removeProperty('--deck-h');
+    return;
+  }
+  // absolute offset of the layout from the top of the document, plus the
+  // .wrap bottom padding, so the page itself doesn't scroll
+  const offset = layout.getBoundingClientRect().top + window.scrollY;
+  layout.style.setProperty('--deck-h', `calc(100vh - ${Math.round(offset)}px - 48px)`);
+}
+
+window.addEventListener('resize', () => {
+  if (!tabPanels.deck.hidden) fitDeckLayout();
+});
 
 // ---- Deck ---------------------------------------------------------------
 async function ensureCatalog() {
@@ -218,6 +240,10 @@ function cardElement(card) {
 function renderDeck() {
   const counts = tally(deck);
   const total = deck.length;
+
+  // keep the card lists where they were after a +/- rebuild
+  const deckScroll = deckListEl.scrollTop;
+  const poolScroll = poolListEl.scrollTop;
 
   deckCountEl.textContent = `${total} / ${deckLimits.max}`;
   deckCountEl.classList.toggle('warn', total > deckLimits.max || total < deckLimits.min);
@@ -295,6 +321,9 @@ function renderDeck() {
     }
     poolListEl.appendChild(grid);
   }
+
+  deckListEl.scrollTop = deckScroll;
+  poolListEl.scrollTop = poolScroll;
 }
 
 const cardWord = (n) => `${n} card${n === 1 ? '' : 's'}`;
