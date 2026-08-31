@@ -505,15 +505,17 @@ function viewFor(duel, userId) {
     endReason: duel.endReason,
     slotToFill: slotToFill(duel),
     deadline: duel.deadline || null,
+    manaPerRound: MANA_PER_ROUND,
     you: {
       ...publicPlayer(me),
       hand: [...me.deck],
       plan: { ...me.plan },
       stats: currentStats(me),
+      baseStats: { ...me.baseStats },
       submitted: me.submitted,
       disruptedNextRound: !!(me.pendingBlock && me.pendingBlock.forRound === duel.round + 1),
     },
-    opponent: { ...publicPlayer(opp), submitted: opp.submitted },
+    opponent: { ...publicPlayer(opp), submitted: opp.submitted, baseStats: { ...opp.baseStats } },
     log: duel.log,
   };
 }

@@ -550,12 +550,37 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
 }
 .duel-head h2 { margin: 0; font-size: 1.2rem; font-family: var(--font-display); }
 
+/* you | center | opponent */
+.duel-grid { display: grid; gap: 16px; }
+.duel-center { min-width: 0; }
+@media (min-width: 900px) {
+  .duel-grid {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 94vw;
+    max-width: 1200px;
+    grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(210px, 250px);
+    grid-template-areas: 'you center oppo';
+    align-items: start;
+  }
+  #duel-you { grid-area: you; }
+  .duel-center { grid-area: center; }
+  #duel-oppo { grid-area: oppo; }
+  #duel-you,
+  #duel-oppo {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+}
+
 .duel-player {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 13px 14px;
   background: var(--panel);
-  margin: 8px 0;
 }
 .duel-player.oppo { border-color: #d9534f55; }
 .duel-player.you { border-color: #5865f255; }
@@ -563,10 +588,18 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1rem;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+.dp-head .dp-sub {
+  display: block;
+  font-family: "Barlow", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-top: 1px;
 }
 
-.dp-bars { display: flex; flex-direction: column; gap: 7px; margin: 8px 0 4px; }
+.dp-bars { display: flex; flex-direction: column; gap: 7px; margin: 10px 0 4px; }
 .dp-bar .bl {
   display: flex;
   justify-content: space-between;
@@ -602,23 +635,120 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
 }
 .chip .ico { width: 11px; height: 11px; }
 
-.dp-ready { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
-.dp-ready.waiting { color: var(--faint); }
+.dp-ready { font-size: 0.82rem; color: var(--good); font-weight: 600; margin-top: 10px; }
+.dp-ready.waiting { color: var(--faint); font-weight: 400; }
 
-.dp-stats {
-  font-size: 0.76rem;
+/* stat block, character-sheet style but compact */
+.dp-group {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+}
+.dp-group > h5 {
+  margin: 0 0 6px;
+  font-family: "Barlow", system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.dp-group dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 3px;
+  column-gap: 8px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.dp-group dt {
   color: var(--muted);
-  margin-top: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dp-group dt .ico { width: 12px; height: 12px; }
+.dp-group dt.fire .ico { color: var(--el-fire); }
+.dp-group dt.water .ico { color: var(--el-water); }
+.dp-group dt.elec .ico { color: var(--el-electric); }
+.dp-group dd { margin: 0; font-weight: 600; }
+.dp-group dd.buffed { color: var(--good); }
+.dp-group dd.nerfed { color: var(--hp); }
+
+.dp-meta {
+  margin-top: 10px;
+  font-size: 0.74rem;
+  color: var(--faint);
   font-variant-numeric: tabular-nums;
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px 12px;
+  gap: 12px;
 }
-.dp-stats .s { display: inline-flex; align-items: center; gap: 4px; }
-.dp-stats .s .ico { width: 11px; height: 11px; }
-.dp-stats .s.fire { color: var(--el-fire); }
-.dp-stats .s.water { color: var(--el-water); }
-.dp-stats .s.elec { color: var(--el-electric); }
+
+/* your queued plays (combo pipeline) */
+.dp-queue { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.dp-queue > h5 {
+  margin: 0 0 6px;
+  font-family: "Barlow", system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.dp-queue ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.dp-queue li {
+  --c: var(--border);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 4px 3px 8px;
+  border-left: 2px solid var(--c);
+  font-size: 0.79rem;
+}
+.dp-queue li.now { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 0 6px 6px 0; }
+.dp-queue li .qr { color: var(--faint); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.dp-queue li .qn { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.dp-queue li .qn .ico { width: 12px; height: 12px; color: var(--c); }
+.dp-queue li .qc { color: var(--mana); font-weight: 600; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
+.dp-queue li.empty .qn { color: var(--faint); font-weight: 400; }
+.dp-queue li[data-type='specialBlock']    { --c: var(--t-specialBlock); }
+.dp-queue li[data-type='special']         { --c: var(--t-special); }
+.dp-queue li[data-type='bonus']           { --c: var(--t-bonus); }
+.dp-queue li[data-type='defensive']       { --c: var(--t-defensive); }
+.dp-queue li[data-type='elementalAttack'] { --c: var(--t-elementalAttack); }
+.dp-queue li[data-type='physicalAttack']  { --c: var(--t-physicalAttack); }
+
+/* mana projection strip in the action area */
+.mana-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+.mana-plan .mp {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 58px;
+}
+.mana-plan .mp.pick { border-color: var(--accent); }
+.mana-plan .mp.burn { border-color: var(--hp); }
+.mana-plan .mp .mp-r { color: var(--faint); font-size: 0.66rem; letter-spacing: 0.03em; }
+.mana-plan .mp .mp-v { color: var(--mana); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+.mana-plan .mp .mp-v .ico { width: 11px; height: 11px; }
+.mana-plan .mp .mp-c { color: var(--muted); font-size: 0.66rem; }
+.mana-plan .mp.burn .mp-c { color: var(--hp); }
+
+.accept-row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+.picked-wrap { display: flex; gap: 12px; align-items: flex-start; margin: 6px 0; }
 
 #duel-log {
   height: auto;
