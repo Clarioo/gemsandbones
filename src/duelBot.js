@@ -17,18 +17,23 @@
 const { getCard } = require('./cards');
 const { currentStats } = require('./duel');
 
-const hasDamage = (card) => (card.behaviour || []).some((b) => b.kind === 'damage');
+const hasDamage = (card) =>
+  (card.behaviour || []).some((b) => b.kind === 'damage' || b.kind === 'dot');
 const isDefensive = (card) =>
-  card.type === 'defensive' || (card.behaviour || []).some((b) => b.kind === 'mitigate');
+  card.type === 'defensive' ||
+  (card.behaviour || []).some((b) => b.kind === 'mitigate' || b.kind === 'heal');
 
 function expectedDamage(card, stats) {
   let total = 0;
   for (const b of card.behaviour || []) {
-    if (b.kind !== 'damage') continue;
-    const el = b.element || 'physical';
-    const lo = el === 'physical' ? stats.attackMin : stats[`${el}AtkMin`] || 0;
-    const hi = el === 'physical' ? stats.attackMax : stats[`${el}AtkMax`] || 0;
-    total += ((lo + hi) / 2) * (typeof b.scale === 'number' ? b.scale : 1);
+    if (b.kind === 'damage') {
+      const el = b.element || 'physical';
+      const lo = el === 'physical' ? stats.attackMin : stats[`${el}AtkMin`] || 0;
+      const hi = el === 'physical' ? stats.attackMax : stats[`${el}AtkMax`] || 0;
+      total += ((lo + hi) / 2) * (typeof b.scale === 'number' ? b.scale : 1);
+    } else if (b.kind === 'dot') {
+      total += (b.damage || 0) * (b.duration || 0);
+    }
   }
   return total;
 }

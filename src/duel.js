@@ -17,15 +17,21 @@
  * - Mana: starts at the character's Mana stat. +MANA_PER_ROUND at the start of
  *   every round. A card costs its manaCost when it resolves; if you cannot pay,
  *   the card is burned with no effect and you lose no mana.
- * - Resolve order within a round: higher card-type base priority first.
- *   (Runtime priority manipulation is not implemented yet.)
+ * - Resolve order within a round: higher runtime priority first. Runtime
+ *   priority = card-type base priority + any `adjustPriority` effects in play
+ *   this round (computed in a pre-pass, before cards resolve).
+ * - `blockCard` cancels an opponent card (this round, if it has not resolved
+ *   yet, or a matching card next round). A cancelled card is burned and its
+ *   mana is still spent.
+ * - `dot` (damage over time) ticks at the START of each of the next N rounds
+ *   and ignores defense and mitigation.
  * - Stat changes from cards last only for this duel (round- or duel-scoped) and
  *   never touch the saved character.
  * - Ends when: a player's HP hits 0, a player leaves, or all 15 rounds resolve
  *   (higher HP wins; equal HP is a draw).
  */
 
-const { getCard, basePriorityOf } = require('./cards');
+const { getCard, basePriorityOf, cardMatchesFilter } = require('./cards');
 const { resolveStats } = require('./stats');
 
 const TOTAL_ROUNDS = 15;
@@ -57,6 +63,8 @@ function makePlayerState({ userId, name, classId, level, deck }) {
     plan: {}, // round number -> cardId (committed, hidden from opponent)
     burned: [],
     effects: [], // { stat, amount, scope: 'round'|'duel', untilRound }
+    dots: [], // { element, damage, roundsLeft, source } -- ticks at start of round
+    pendingBlock: null, // { filter, forRound } set by an opponent's nextRound blockCard
     submitted: false, // has acted for the upcoming round?
     connected: true,
   };
@@ -207,7 +215,16 @@ function autoSubmit(duel, userId) {
 // Round resolution
 // ---------------------------------------------------------------------------
 
-function applyBehaviour(beh, actor, target, round, log, rng) {
+/**
+ * Run one behaviour of a card that is resolving now.
+ *   play = { actor, opponent, card, resolved, blocked }
+ *   ctx  = { plays, round, log, rng }
+ */
+function applyBehaviour(beh, play, ctx) {
+  const { plays, round, log, rng } = ctx;
+  const actor = play.actor;
+  const target = play.opponent;
+
   switch (beh.kind) {
     case 'damage': {
       const a = currentStats(actor);
@@ -223,6 +240,34 @@ function applyBehaviour(beh, actor, target, round, log, rng) {
       dmg = Math.round(dmg * (1 - pct / 100));
       target.hp -= dmg;
       log.push(`${actor.name}'s attack hits ${target.name} for ${dmg} ${el} damage (HP ${Math.max(0, target.hp)})`);
+      if (beh.lifesteal && dmg > 0) {
+        const healed = Math.min(Math.round(dmg * beh.lifesteal), actor.maxHp - actor.hp);
+        if (healed > 0) {
+          actor.hp += healed;
+          log.push(`${actor.name} drains ${healed} HP (HP ${actor.hp})`);
+        }
+      }
+      break;
+    }
+    case 'heal': {
+      const who = beh.target === 'opponent' ? target : actor;
+      const amount = Math.max(0, Math.round(beh.amount || 0));
+      const healed = Math.min(amount, who.maxHp - who.hp);
+      who.hp += healed;
+      log.push(`${who.name} heals ${healed} (HP ${who.hp})`);
+      break;
+    }
+    case 'dot': {
+      const who = beh.target === 'self' ? actor : target;
+      who.dots.push({
+        element: beh.element || 'physical',
+        damage: Math.max(0, Math.round(beh.damage || 0)),
+        roundsLeft: Math.max(1, Math.round(beh.duration || 1)),
+        source: actor.name,
+      });
+      log.push(
+        `${who.name} is afflicted: ${Math.max(0, Math.round(beh.damage || 0))} ${beh.element || 'physical'} damage/round for ${Math.max(1, Math.round(beh.duration || 1))} rounds`,
+      );
       break;
     }
     case 'mitigate': {
@@ -243,13 +288,51 @@ function applyBehaviour(beh, actor, target, round, log, rng) {
       log.push(`${who.name}: ${sign}${beh.amount} ${beh.stat} (${beh.duration === 'duel' ? 'this duel' : 'this round'})`);
       break;
     }
-    case 'blockCard':
+    case 'blockCard': {
+      if (beh.scope === 'nextRound') {
+        target.pendingBlock = { filter: beh.filter || null, forRound: round + 1 };
+        log.push(`${actor.name} disrupts ${target.name}'s next move`);
+        break;
+      }
+      // thisRound: cancel the opponent's card if it is still waiting to resolve
+      const victim = plays.find((pl) => pl.actor === target && !pl.resolved && !pl.blocked);
+      if (victim && cardMatchesFilter(victim.card, beh.filter)) {
+        victim.blocked = true;
+        victim.blockedBy = play.card.name;
+        log.push(`${actor.name}'s ${play.card.name} cancels ${target.name}'s ${victim.card.name}`);
+      } else {
+        log.push(`${actor.name}'s ${play.card.name} finds nothing to cancel`);
+      }
+      break;
+    }
     case 'adjustPriority':
-      log.push(`(${beh.kind} not implemented yet)`);
+      // resolved in the pre-pass in resolveRound(); nothing to do at execution time
       break;
     default:
       log.push(`(unknown behaviour: ${beh.kind})`);
   }
+}
+
+/**
+ * Runtime priority for a play: base priority of its card type, plus every
+ * `adjustPriority` effect in the round that targets it. A card's own
+ * `adjustPriority` with target 'self' speeds it up; an opponent card's
+ * `adjustPriority` with target 'opponent' lands on this play.
+ */
+function runtimePriority(play, plays) {
+  let p = basePriorityOf(play.card);
+  for (const other of plays) {
+    for (const beh of other.card.behaviour || []) {
+      if (beh.kind !== 'adjustPriority') continue;
+      const amount = beh.amount || 0;
+      if (beh.target === 'opponent') {
+        if (other !== play) p += amount;
+      } else if (other === play) {
+        p += amount;
+      }
+    }
+  }
+  return p;
 }
 
 /**
@@ -269,14 +352,43 @@ function resolveRound(duel, rng = Math.random) {
     p._mitigatePct = 0;
   }
 
-  // 2. reveal + mana check
+  // 1b. damage-over-time ticks (start of round, before any card resolves).
+  //     Ignores defense and mitigation.
+  for (const p of ps) {
+    for (const d of p.dots) {
+      p.hp -= d.damage;
+      d.roundsLeft -= 1;
+      entries.push(
+        `${p.name} suffers ${d.damage} ${d.element} damage from a lingering wound (HP ${Math.max(0, p.hp)})`,
+      );
+    }
+    p.dots = p.dots.filter((d) => d.roundsLeft > 0);
+  }
+
+  // 2. reveal + mana check + "disrupted next round" check
   const plays = [];
   for (const p of ps) {
     const cardId = p.plan[round];
     delete p.plan[round];
     const card = cardId ? getCard(cardId) : null;
+
+    // consume a pending block aimed at this round, whatever the card turns out to be
+    const pb = p.pendingBlock;
+    if (pb && pb.forRound <= round) p.pendingBlock = null;
+
     if (!card) {
       entries.push(`${p.name} played no card`);
+      continue;
+    }
+    if (p.hp <= 0) {
+      p.burned.push(card.id);
+      entries.push(`${p.name} is down and cannot act`);
+      continue;
+    }
+    if (pb && pb.forRound === round && cardMatchesFilter(card, pb.filter)) {
+      if (p.mana >= card.manaCost) p.mana -= card.manaCost; // mana is still spent
+      p.burned.push(card.id);
+      entries.push(`${p.name}'s ${card.name} is disrupted and fails`);
       continue;
     }
     if (p.mana < card.manaCost) {
@@ -285,25 +397,39 @@ function resolveRound(duel, rng = Math.random) {
       continue;
     }
     p.mana -= card.manaCost;
-    plays.push({ actor: p, card, opponent: duel.players[opponentId(duel, p.userId)] });
+    plays.push({
+      actor: p,
+      card,
+      opponent: duel.players[opponentId(duel, p.userId)],
+      resolved: false,
+      blocked: false,
+    });
     entries.push(`${p.name} plays ${card.name} (${card.type})`);
   }
 
-  // 3. resolve by base priority, highest first.
-  //    Priority tie -> the player with higher Dexterity acts first;
-  //    still tied -> coin flip.
+  // 3. order by runtime priority (base + adjustPriority effects), highest first.
+  //    Priority tie -> higher Dexterity acts first; still tied -> coin flip.
+  const priority = new Map(plays.map((pl) => [pl, runtimePriority(pl, plays)]));
   plays.sort((x, y) => {
-    const byPriority = basePriorityOf(y.card) - basePriorityOf(x.card);
+    const byPriority = priority.get(y) - priority.get(x);
     if (byPriority !== 0) return byPriority;
     const dx = currentStats(x.actor).dexterity;
     const dy = currentStats(y.actor).dexterity;
     if (dx !== dy) return dy - dx;
     return rng() < 0.5 ? -1 : 1;
   });
+
+  const ctx = { plays, round, log: entries, rng };
   for (const play of plays) {
-    for (const beh of play.card.behaviour || []) {
-      applyBehaviour(beh, play.actor, play.opponent, round, entries, rng);
+    if (play.blocked) {
+      entries.push(`${play.actor.name}'s ${play.card.name} was cancelled`);
+      play.actor.burned.push(play.card.id);
+      continue;
     }
+    for (const beh of play.card.behaviour || []) {
+      applyBehaviour(beh, play, ctx);
+    }
+    play.resolved = true;
     play.actor.burned.push(play.card.id);
   }
 
@@ -362,6 +488,7 @@ function publicPlayer(p) {
     deckCount: p.deck.length,
     burnedCount: p.burned.length,
     plannedCount: Object.keys(p.plan).length,
+    dots: p.dots.map((d) => ({ element: d.element, damage: d.damage, roundsLeft: d.roundsLeft })),
   };
 }
 
@@ -384,6 +511,7 @@ function viewFor(duel, userId) {
       plan: { ...me.plan },
       stats: currentStats(me),
       submitted: me.submitted,
+      disruptedNextRound: !!(me.pendingBlock && me.pendingBlock.forRound === duel.round + 1),
     },
     opponent: { ...publicPlayer(opp), submitted: opp.submitted },
     log: duel.log,

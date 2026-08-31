@@ -565,6 +565,18 @@ function renderPlayerPanel(el, p, isYou, stats) {
 
   el.append(head, hpBar(p.hp, p.maxHp), meta);
 
+  const status = [];
+  for (const d of p.dots || []) {
+    status.push(`☠ ${d.element} ${d.damage}/rd (${d.roundsLeft} left)`);
+  }
+  if (isYou && p.disruptedNextRound) status.push('✖ attack disrupted next round');
+  if (status.length) {
+    const st = document.createElement('div');
+    st.className = 'dp-meta';
+    st.textContent = status.join(' · ');
+    el.append(st);
+  }
+
   if (isYou && stats) {
     const s = document.createElement('div');
     s.className = 'dp-stats';
