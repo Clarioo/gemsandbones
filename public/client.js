@@ -630,8 +630,10 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 // ---- Duel ---------------------------------------------------------------
+const PLAN_AHEAD = 5; // rounds planned ahead (matches the server)
 let duelState = null;
 let planSlots = [null, null, null, null, null];
+let pendingCard = null; // card chosen for the far slot, not yet accepted
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const typeName = (id) => {
@@ -715,6 +717,7 @@ socket.on('duel:start', async ({ view }) => {
   await ensureCatalog();
   duelState = view;
   planSlots = [null, null, null, null, null];
+  pendingCard = null;
   duelSearchEl.hidden = true;
   findDuelBtn.hidden = false;
   showOnly(duelView);
@@ -727,6 +730,7 @@ socket.on('duel:update', ({ view }) => {
 });
 socket.on('duel:round', ({ view }) => {
   duelState = view;
+  pendingCard = null; // new round, fresh pick
   renderDuel();
 });
 socket.on('duel:end', ({ view }) => {
@@ -796,23 +800,50 @@ function statusChip(colorKey, iconName, text) {
   return c;
 }
 
-function renderPlayerPanel(el, p, isYou, stats) {
+/** One <dl> row. delta compares a live value to its base (you only). */
+function statRow(dl, { label, iconName, elClass, value, base }) {
+  const dt = document.createElement('dt');
+  if (elClass) dt.className = elClass;
+  if (iconName) dt.append(icon(iconName, 12), document.createTextNode(' ' + label));
+  else dt.textContent = label;
+  const dd = document.createElement('dd');
+  dd.textContent = value;
+  if (typeof base === 'number' && typeof value === 'number') {
+    if (value > base) dd.className = 'buffed';
+    else if (value < base) dd.className = 'nerfed';
+  }
+  dl.append(dt, dd);
+}
+
+function statGroup(title, build) {
+  const g = document.createElement('div');
+  g.className = 'dp-group';
+  const h = document.createElement('h5');
+  h.textContent = title;
+  const dl = document.createElement('dl');
+  build(dl);
+  g.append(h, dl);
+  return g;
+}
+
+function renderPlayerPanel(el, p, isYou) {
   el.replaceChildren();
+  const st = p.stats || p.baseStats || {};
+  const base = p.baseStats || {};
 
   const head = document.createElement('div');
   head.className = 'dp-head';
-  head.textContent = `${p.name} — ${cap(p.classId)} · Lvl ${p.level}`;
+  head.textContent = p.name;
+  const sub = document.createElement('span');
+  sub.className = 'dp-sub';
+  sub.textContent = `${cap(p.classId)} · Level ${p.level}`;
+  head.append(sub);
   el.append(head);
 
   const bars = document.createElement('div');
   bars.className = 'dp-bars';
   bars.append(hpTrack(p.hp, p.maxHp), manaLine(p.mana));
   el.append(bars);
-
-  const counts = document.createElement('div');
-  counts.className = 'dp-stats';
-  counts.append(seg(null, null, `Deck ${p.deckCount}`), seg(null, null, `Burned ${p.burnedCount}`));
-  el.append(counts);
 
   const chips = [];
   for (const d of p.dots || []) {
@@ -829,25 +860,85 @@ function renderPlayerPanel(el, p, isYou, stats) {
     el.append(box);
   }
 
-  if (isYou && stats) {
-    const s = document.createElement('div');
-    s.className = 'dp-stats';
-    s.append(
-      seg(null, null, `Atk ${stats.attackMin}–${stats.attackMax}`),
-      seg(null, null, `Def ${stats.defense}`),
-      seg('fire', 'fire', `${stats.fireAtkMin}–${stats.fireAtkMax}`),
-      seg('water', 'water', `${stats.waterAtkMin}–${stats.waterAtkMax}`),
-      seg('elec', 'electric', `${stats.electricAtkMin}–${stats.electricAtkMax}`),
+  el.append(
+    statGroup('Combat', (dl) => {
+      statRow(dl, { label: 'Attack', iconName: 'physical', value: `${st.attackMin}–${st.attackMax}` });
+      statRow(dl, { label: 'Defense', iconName: 'defensive', value: st.defense, base: base.defense });
+    }),
+  );
+
+  const hasElemental =
+    (st.fireAtkMax || 0) + (st.waterAtkMax || 0) + (st.electricAtkMax || 0) > 0;
+  if (hasElemental) {
+    el.append(
+      statGroup('Elemental attack', (dl) => {
+        statRow(dl, { label: 'Fire', iconName: 'fire', elClass: 'fire', value: `${st.fireAtkMin}–${st.fireAtkMax}` });
+        statRow(dl, { label: 'Water', iconName: 'water', elClass: 'water', value: `${st.waterAtkMin}–${st.waterAtkMax}` });
+        statRow(dl, { label: 'Electric', iconName: 'electric', elClass: 'elec', value: `${st.electricAtkMin}–${st.electricAtkMax}` });
+      }),
     );
-    el.append(s);
   }
 
+  el.append(
+    statGroup('General', (dl) => {
+      statRow(dl, { label: 'Strength', iconName: 'strength', value: base.strength });
+      statRow(dl, { label: 'Vitality', iconName: 'vitality', value: base.vitality });
+      statRow(dl, { label: 'Intelligence', iconName: 'intelligence', value: base.intelligence });
+      statRow(dl, { label: 'Dexterity', iconName: 'dexterity', value: base.dexterity });
+    }),
+  );
+
+  const meta = document.createElement('div');
+  meta.className = 'dp-meta';
+  meta.append(seg(null, null, `Deck ${p.deckCount}`), seg(null, null, `Burned ${p.burnedCount}`));
+  el.append(meta);
+
+  if (isYou) el.append(queuedPlays());
+
   if (!isYou && duelState.phase !== 'ended') {
-    const st = document.createElement('div');
-    st.className = 'dp-ready' + (p.submitted ? '' : ' waiting');
-    st.textContent = p.submitted ? 'Ready ✓' : 'Choosing…';
-    el.append(st);
+    const r = document.createElement('div');
+    r.className = 'dp-ready' + (p.submitted ? '' : ' waiting');
+    r.textContent = p.submitted ? 'Ready ✓' : 'Choosing…';
+    el.append(r);
   }
+}
+
+/** Your queued cards for this round and the rounds ahead — the combo pipeline. */
+function queuedPlays() {
+  const v = duelState;
+  const wrap = document.createElement('div');
+  wrap.className = 'dp-queue';
+  const h = document.createElement('h5');
+  h.textContent = 'Queued plays';
+  wrap.append(h);
+
+  const ol = document.createElement('ol');
+  const last = Math.min(v.totalRounds, v.round + PLAN_AHEAD - 1);
+  for (let r = v.round; r <= last; r++) {
+    const cid = r === v.slotToFill && pendingCard ? pendingCard : v.you.plan[r];
+    const li = document.createElement('li');
+    if (r === v.round) li.classList.add('now');
+    const rr = document.createElement('span');
+    rr.className = 'qr';
+    rr.textContent = r === v.round ? `R${r} now` : `R${r}`;
+    const nm = document.createElement('span');
+    nm.className = 'qn';
+    if (cid) {
+      const c = cardCatalog.get(cid);
+      li.dataset.type = c.type;
+      nm.append(icon(c.type, 12), document.createTextNode(c.name));
+    } else {
+      li.classList.add('empty');
+      nm.textContent = r === v.slotToFill ? 'choosing…' : '—';
+    }
+    const cc = document.createElement('span');
+    cc.className = 'qc';
+    if (cid) cc.textContent = `${cardCatalog.get(cid).manaCost}`;
+    li.append(rr, nm, cc);
+    ol.append(li);
+  }
+  wrap.append(ol);
+  return wrap;
 }
 
 function duelCard(cardId, opts = {}) {
@@ -916,7 +1007,7 @@ function renderDuel() {
   tickDuelTimer();
 
   renderPlayerPanel(duelOppoEl, v.opponent, false);
-  renderPlayerPanel(duelYouEl, v.you, true, v.you.stats);
+  renderPlayerPanel(duelYouEl, v.you, true);
 
   duelLogEl.replaceChildren();
   for (const r of v.log) {
@@ -963,29 +1054,128 @@ function renderAction() {
 
   // queue one card for the far slot (rounds 6..15)
   if (v.slotToFill !== null) {
-    duelActionEl.append(note(`Choose your card for round ${v.slotToFill}`));
-    const hand = document.createElement('div');
-    hand.className = 'hand';
-    for (const id of handOrder(v.you.hand)) {
-      const count = v.you.hand.filter((x) => x === id).length;
-      hand.append(
-        duelCard(id, {
-          onClick: () => socket.emit('duel:card', { round: v.slotToFill, cardId: id }),
-          sub: count > 1 ? `×${count}` : '',
-        }),
+    const box = document.createElement('div');
+    box.append(note(`Pick your card for round ${v.slotToFill}, then Accept.`));
+    box.append(manaPlanStrip(projectMana(v, pendingCard)));
+
+    if (pendingCard) {
+      const picked = document.createElement('div');
+      picked.className = 'picked-wrap';
+      picked.append(gameCard(pendingCard, {}));
+      box.append(picked);
+
+      const row = document.createElement('div');
+      row.className = 'accept-row';
+      const accept = document.createElement('button');
+      accept.className = 'btn discord';
+      accept.textContent = 'Accept';
+      accept.addEventListener('click', () =>
+        socket.emit('duel:card', { round: v.slotToFill, cardId: pendingCard }),
       );
+      const change = document.createElement('button');
+      change.className = 'btn ghost';
+      change.textContent = 'Change';
+      change.addEventListener('click', () => {
+        pendingCard = null;
+        renderDuel();
+      });
+      row.append(accept, change);
+      box.append(row);
+    } else {
+      const hand = document.createElement('div');
+      hand.className = 'hand';
+      for (const id of handOrder(v.you.hand)) {
+        const count = v.you.hand.filter((x) => x === id).length;
+        hand.append(
+          duelCard(id, {
+            onClick: () => {
+              pendingCard = id;
+              renderDuel();
+            },
+            sub: count > 1 ? `×${count}` : '',
+          }),
+        );
+      }
+      if (!v.you.hand.length) hand.append(note('No cards left in hand.'));
+      box.append(hand);
     }
-    if (!v.you.hand.length) hand.append(note('No cards left in hand.'));
-    duelActionEl.append(hand);
+    duelActionEl.append(box);
     return;
   }
 
   // rounds 11-15: nothing to plan
+  const box = document.createElement('div');
+  box.append(manaPlanStrip(projectMana(v, null)));
   const cont = document.createElement('button');
   cont.className = 'btn discord';
   cont.textContent = 'Continue';
   cont.addEventListener('click', () => socket.emit('duel:ready'));
-  duelActionEl.append(note('Nothing to plan this round.'), cont);
+  box.append(note('Nothing to plan this round.'), cont);
+  duelActionEl.append(box);
+}
+
+/** Projected end-of-round mana for the planning window, current round first. */
+function projectMana(v, slotCardId) {
+  const rows = [];
+  let m = v.you.mana;
+  const end = v.slotToFill == null ? v.round : v.slotToFill;
+  for (let r = v.round; r <= end; r++) {
+    m += v.manaPerRound;
+    let cid = v.you.plan[r];
+    if (r === v.slotToFill) cid = slotCardId;
+    let cost = 0;
+    let burn = false;
+    if (cid) {
+      cost = cardCatalog.get(cid).manaCost;
+      if (m >= cost) m -= cost;
+      else burn = true;
+    }
+    rows.push({ round: r, cid, cost, burn, endMana: m, isPick: r === v.slotToFill });
+  }
+  return rows;
+}
+
+function projectManaOpening(v) {
+  const rows = [];
+  let m = v.you.mana;
+  for (let i = 0; i < PLAN_AHEAD; i++) {
+    m += v.manaPerRound;
+    const cid = planSlots[i];
+    let cost = 0;
+    let burn = false;
+    if (cid) {
+      cost = cardCatalog.get(cid).manaCost;
+      if (m >= cost) m -= cost;
+      else burn = true;
+    }
+    rows.push({ round: i + 1, cid, cost, burn, endMana: m, isPick: false });
+  }
+  return rows;
+}
+
+function manaPlanStrip(rows) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mana-plan';
+  for (const row of rows) {
+    const mp = document.createElement('div');
+    mp.className = 'mp' + (row.isPick ? ' pick' : '') + (row.burn ? ' burn' : '');
+    mp.title = row.burn ? 'Not enough mana — this card would burn with no effect' : '';
+    const r = document.createElement('div');
+    r.className = 'mp-r';
+    r.textContent = row.isPick ? `R${row.round} · pick` : `R${row.round}`;
+    const val = document.createElement('div');
+    val.className = 'mp-v';
+    val.append(icon('mana', 11), document.createTextNode(String(row.endMana)));
+    mp.append(r, val);
+    if (row.cid && (row.cost > 0 || row.burn)) {
+      const c = document.createElement('div');
+      c.className = 'mp-c';
+      c.textContent = row.burn ? `−${row.cost} ✗` : `−${row.cost}`;
+      mp.append(c);
+    }
+    wrap.append(mp);
+  }
+  return wrap;
 }
 
 function renderPlanBuilder() {
@@ -1046,13 +1236,14 @@ function renderPlanBuilder() {
 
   const lock = document.createElement('button');
   lock.className = 'btn discord';
-  lock.textContent = 'Lock in plan';
+  lock.textContent = 'Accept plan';
   lock.disabled = planSlots.some((x) => !x);
   lock.addEventListener('click', () => socket.emit('duel:plan', { cards: planSlots }));
 
   wrap.append(
     note('Plan your first 5 rounds. Your opponent will not see them. Click a card to place it, click a slot to clear it.'),
     slots,
+    manaPlanStrip(projectManaOpening(v)),
     hand,
     lock,
   );
