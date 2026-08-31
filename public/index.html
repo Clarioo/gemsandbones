@@ -4,9 +4,78 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Gems and Bones</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
+    <!-- Icon sprite: line-art glyphs reused across cards, stats and the combat log.
+         fill:none + stroke:currentColor so each icon takes its parent's colour. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-specialBlock" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="6.4" />
+        <path d="M3.6 3.6 L12.4 12.4" />
+      </symbol>
+      <symbol id="i-special" viewBox="0 0 16 16">
+        <path d="M8 1.6 L9.7 6.1 L14.4 8 L9.7 9.9 L8 14.4 L6.3 9.9 L1.6 8 L6.3 6.1 Z" />
+      </symbol>
+      <symbol id="i-bonus" viewBox="0 0 16 16">
+        <path d="M8 14 V3.2 M3.5 7.7 L8 3 L12.5 7.7" />
+      </symbol>
+      <symbol id="i-defensive" viewBox="0 0 16 16">
+        <path d="M8 1.5 L13.5 3.3 V8 C13.5 11.6 11 13.7 8 14.7 C5 13.7 2.5 11.6 2.5 8 V3.3 Z" />
+      </symbol>
+      <symbol id="i-elementalAttack" viewBox="0 0 16 16">
+        <path d="M8 1.5 V14.5 M1.5 8 H14.5 M3.4 3.4 L12.6 12.6 M12.6 3.4 L3.4 12.6" />
+      </symbol>
+      <symbol id="i-physicalAttack" viewBox="0 0 16 16">
+        <path d="M3.5 12.5 L11 5 M11.5 3 L13 4.5 L11 6.5 L9.5 5 Z M3 10 L5 12 M2.5 13.5 L4 12" />
+      </symbol>
+      <symbol id="i-fire" viewBox="0 0 16 16">
+        <path d="M8 14.6 C4.7 14.6 3.4 11.8 4.4 9 C5.1 10.6 6 10.1 6 8.4 C6 5.4 8.7 3.6 8.7 1.4 C9.8 4.2 12 5.6 12 9 C12 12 10.6 14.6 8 14.6 Z" />
+      </symbol>
+      <symbol id="i-water" viewBox="0 0 16 16">
+        <path d="M8 1.8 C8 1.8 3.2 7.6 3.2 10.8 A4.8 4.8 0 0 0 12.8 10.8 C12.8 7.6 8 1.8 8 1.8 Z" />
+      </symbol>
+      <symbol id="i-electric" viewBox="0 0 16 16">
+        <path d="M9.2 1.4 L3.4 8.8 H7 L6.2 14.6 L12.6 6.4 H8.6 Z" />
+      </symbol>
+      <symbol id="i-physical" viewBox="0 0 16 16">
+        <path d="M3.5 12.5 L11 5 M11.5 3 L13 4.5 L11 6.5 L9.5 5 Z M3 10 L5 12 M2.5 13.5 L4 12" />
+      </symbol>
+      <symbol id="i-heart" viewBox="0 0 16 16">
+        <path d="M8 13.7 C8 13.7 2 9.9 2 5.9 A3.2 3.2 0 0 1 8 4.2 A3.2 3.2 0 0 1 14 5.9 C14 9.9 8 13.7 8 13.7 Z" />
+      </symbol>
+      <symbol id="i-heal" viewBox="0 0 16 16">
+        <path d="M8 2.6 V13.4 M2.6 8 H13.4" />
+      </symbol>
+      <symbol id="i-mana" viewBox="0 0 16 16">
+        <path d="M8 1.6 L9.7 6.1 L14.4 8 L9.7 9.9 L8 14.4 L6.3 9.9 L1.6 8 L6.3 6.1 Z" />
+      </symbol>
+      <symbol id="i-strength" viewBox="0 0 16 16">
+        <path d="M3 13 V10 Q3 6.6 6.4 6.6 H8.4 V4.2" />
+        <path d="M3 13 H7" />
+        <circle cx="8.5" cy="2.6" r="2" />
+      </symbol>
+      <symbol id="i-vitality" viewBox="0 0 16 16">
+        <path d="M1.5 8.4 H5 L6.4 4 L8.8 12.4 L10.2 8.4 H14.5" />
+      </symbol>
+      <symbol id="i-intelligence" viewBox="0 0 16 16">
+        <path d="M8 1.6 A4.4 4.4 0 0 0 5 9.1 C5.7 9.8 6 10.4 6 11.6 H10 C10 10.4 10.3 9.8 11 9.1 A4.4 4.4 0 0 0 8 1.6 Z M6.4 13.2 H9.6 M7.1 14.6 H8.9" />
+      </symbol>
+      <symbol id="i-dexterity" viewBox="0 0 16 16">
+        <path d="M13 2.5 C7.3 3 3.5 7.4 3 13.2 M3 13.2 L11.2 5 M4.6 10 H8.6 M6.4 7.8 H10.2 M8 5.6 H11" />
+      </symbol>
+      <symbol id="i-disrupt" viewBox="0 0 16 16">
+        <path d="M2.5 8 H13.5 M8 2.5 V13.5" transform="rotate(45 8 8)" />
+        <circle cx="8" cy="8" r="6.2" />
+      </symbol>
+    </svg>
+
     <main class="wrap">
       <h1>Gems &amp; Bones</h1>
 

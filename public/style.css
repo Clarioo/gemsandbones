@@ -2,14 +2,49 @@
   --bg: #0f1220;
   --panel: #191d31;
   --panel-2: #232842;
+  --panel-3: #2a3150;
   --text: #e8eaf5;
   --muted: #9aa0bd;
+  --faint: #6b7095;
   --accent: #5865f2;        /* Discord blurple */
   --accent-hover: #4752c4;
   --border: #2c3252;
+
+  /* card types — coolest (acts first) to hottest (acts last) */
+  --t-specialBlock: #b57bff;
+  --t-special: #6e8bff;
+  --t-bonus: #3fb97a;
+  --t-defensive: #3bb0c4;
+  --t-elementalAttack: #e8963a;
+  --t-physicalAttack: #e5484d;
+
+  /* elements — one colour wherever the element appears */
+  --el-fire: #f0883e;
+  --el-water: #4c9aff;
+  --el-electric: #f5c242;
+  --el-physical: #e5484d;
+  --el-poison: #9ecb3f;
+
+  --mana: #4c9aff;
+  --hp: #e5657f;
+  --good: #52c98a;
+
+  --font-display: "Cinzel", Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
+
+/* line-art icon: takes size from width/height attrs, colour from currentColor */
+.ico {
+  display: inline-block;
+  vertical-align: -0.15em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
 
 body {
   margin: 0;
@@ -193,12 +228,29 @@ h1 {
   row-gap: 4px;
   column-gap: 8px;
 }
-.stat-group dt { color: var(--muted); font-size: 0.9rem; }
+.stat-group dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.stat-group dt .ico { width: 14px; height: 14px; }
+.stat-group dt[data-stat='strength']     { color: var(--el-physical); }
+.stat-group dt[data-stat='vitality']     { color: var(--good); }
+.stat-group dt[data-stat='intelligence'] { color: var(--el-water); }
+.stat-group dt[data-stat='dexterity']    { color: var(--el-electric); }
+.stat-group dt[data-el='fire'] .ico     { color: var(--el-fire); }
+.stat-group dt[data-el='water'] .ico    { color: var(--el-water); }
+.stat-group dt[data-el='electric'] .ico { color: var(--el-electric); }
 .stat-group dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+.stat-group dd[data-el='fire']     { color: var(--el-fire); }
+.stat-group dd[data-el='water']    { color: var(--el-water); }
+.stat-group dd[data-el='electric'] { color: var(--el-electric); }
 
 /* ---- Deck ---- */
 .deck-cols {
@@ -217,47 +269,137 @@ h1 {
   letter-spacing: 0.05em;
   color: var(--muted);
 }
-.card-list { display: flex; flex-direction: column; gap: 8px; }
-
-.card-tile {
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--panel-2);
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  align-content: start;
 }
-.card-tile[data-type='specialBlock']    { border-left-color: #b57bff; }
-.card-tile[data-type='special']         { border-left-color: #7b8dff; }
-.card-tile[data-type='bonus']           { border-left-color: #55c98a; }
-.card-tile[data-type='defensive']       { border-left-color: #46c6c6; }
-.card-tile[data-type='elementalAttack'] { border-left-color: #e0913a; }
-.card-tile[data-type='physicalAttack']  { border-left-color: #d9534f; }
 
-.card-head {
+/* ---- Card component: deck editor, card pool, duel hand ---- */
+.gcard {
+  --c: var(--accent);
+  position: relative;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
 }
-.type-badge {
-  font-size: 0.68rem;
+button.gcard { cursor: pointer; }
+button.gcard:hover:not(:disabled) { border-color: var(--c); }
+.gcard:disabled { opacity: 0.4; cursor: default; }
+.gcard.is-selected { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+
+.gcard[data-type='specialBlock']    { --c: var(--t-specialBlock); }
+.gcard[data-type='special']         { --c: var(--t-special); }
+.gcard[data-type='bonus']           { --c: var(--t-bonus); }
+.gcard[data-type='defensive']       { --c: var(--t-defensive); }
+.gcard[data-type='elementalAttack'] { --c: var(--t-elementalAttack); }
+.gcard[data-type='physicalAttack']  { --c: var(--t-physicalAttack); }
+
+.gcard__strip { height: 4px; background: var(--c); flex: none; }
+
+.gcard__mana {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mana);
+  border: 2px solid var(--panel-2);
+  color: #08203c;
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  z-index: 2;
+}
+.gcard__mana.free {
+  font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
 }
-.mana { font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.card-name { font-weight: 600; margin: 4px 0 2px; }
-.card-desc { margin: 0; font-size: 0.85rem; color: var(--muted); }
-.card-foot {
+
+.gcard__body {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  flex: 1;
 }
-.card-classes { font-size: 0.75rem; color: var(--muted); }
-.card-controls { display: flex; align-items: center; gap: 6px; }
-.count { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gcard__type {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 30px; /* clear the mana disc */
+  min-height: 16px;
+  color: var(--c);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.gcard__type .ico { width: 12px; height: 12px; }
+.gcard__art {
+  height: 64px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--c) 15%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--c) 26%, var(--border));
+}
+.gcard__art .ico {
+  width: 28px;
+  height: 28px;
+  color: color-mix(in srgb, var(--c) 60%, var(--faint));
+}
+.gcard__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.15;
+}
+.gcard__meta { font-size: 0.63rem; color: var(--faint); letter-spacing: 0.02em; }
+.gcard__rule {
+  margin: 0;
+  font-size: 0.71rem;
+  line-height: 1.36;
+  color: var(--muted);
+  flex: 1;
+}
+.gcard__rule .eltag {
+  color: var(--e, var(--muted));
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gcard__rule .eltag .ico { width: 11px; height: 11px; }
+
+.gcard__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+  font-size: 0.63rem;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+.gcard__foot .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.gcard__controls { display: flex; align-items: center; gap: 6px; }
+
 .mini-btn {
   border: 1px solid var(--border);
   background: var(--panel);
@@ -270,7 +412,7 @@ h1 {
 }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); }
 .mini-btn:disabled { opacity: 0.4; cursor: default; }
-.pill.warn { color: #e0913a; }
+.pill.warn { color: var(--t-elementalAttack); }
 
 /* ---- Duel ---- */
 .duel-cta {
@@ -287,103 +429,172 @@ h1 {
   gap: 12px;
   margin: 16px 0 12px;
 }
-.duel-head h2 { margin: 0; font-size: 1.2rem; }
+.duel-head h2 { margin: 0; font-size: 1.2rem; font-family: var(--font-display); }
 
 .duel-player {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 13px 14px;
   background: var(--panel);
   margin: 8px 0;
 }
 .duel-player.oppo { border-color: #d9534f55; }
 .duel-player.you { border-color: #5865f255; }
-.dp-head { font-weight: 600; margin-bottom: 6px; }
-.dp-meta, .dp-stats, .dp-status {
-  font-size: 0.82rem;
+.dp-head {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.dp-bars { display: flex; flex-direction: column; gap: 7px; margin: 8px 0 4px; }
+.dp-bar .bl {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
   color: var(--muted);
-  margin-top: 6px;
+  margin-bottom: 4px;
   font-variant-numeric: tabular-nums;
 }
-.dp-status { color: var(--text); }
+.dp-bar .bl .v { display: inline-flex; align-items: center; gap: 5px; color: var(--text); font-weight: 600; }
+.dp-bar .bl .v .ico { width: 12px; height: 12px; }
+.dp-bar .bl .v.hp .ico { color: var(--hp); }
+.dp-bar .bl .v.mana .ico { color: var(--mana); }
+.track { height: 9px; background: var(--panel-3); border-radius: 999px; overflow: hidden; }
+.track > .fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.fill.hp { background: linear-gradient(90deg, var(--t-defensive), var(--good)); }
+.fill.hp.wounded { background: linear-gradient(90deg, var(--el-fire), var(--el-electric)); }
+.fill.hp.critical { background: var(--hp); animation: hp-pulse 1.1s ease-in-out infinite; }
+.fill.mana { background: linear-gradient(90deg, #2f6fd0, var(--mana)); }
+@keyframes hp-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .fill.hp.critical { animation: none; } }
 
-.hpbar {
-  height: 10px;
-  background: var(--panel-2);
+.dp-status { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px 2px 6px;
   border-radius: 999px;
-  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--e, var(--faint)) 16%, var(--panel-2));
+  color: var(--e, var(--muted));
 }
-.hpbar > div {
-  height: 100%;
-  background: linear-gradient(90deg, #d9534f, #e0913a);
-  transition: width 0.4s ease;
+.chip .ico { width: 11px; height: 11px; }
+
+.dp-ready { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+.dp-ready.waiting { color: var(--faint); }
+
+.dp-stats {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-top: 9px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
 }
-.duel-player.you .hpbar > div { background: linear-gradient(90deg, #46c6c6, #55c98a); }
+.dp-stats .s { display: inline-flex; align-items: center; gap: 4px; }
+.dp-stats .s .ico { width: 11px; height: 11px; }
+.dp-stats .s.fire { color: var(--el-fire); }
+.dp-stats .s.water { color: var(--el-water); }
+.dp-stats .s.elec { color: var(--el-electric); }
 
 #duel-log {
   height: auto;
   min-height: 0;
-  max-height: 240px;
+  max-height: 260px;
   margin: 10px 0;
 }
 #duel-log:empty { display: none; }
+#duel-log li { padding: 3px 0; }
+#duel-log li.turn {
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-style: normal;
+  margin-top: 6px;
+}
+#duel-log li.dmg { color: #f2a2a2; }
+#duel-log li.dot { color: var(--el-poison); }
+#duel-log li.heal { color: var(--good); }
+#duel-log li.buff { color: var(--t-bonus); }
+#duel-log li.debuff { color: #e5a06b; }
+#duel-log li.block { color: var(--t-specialBlock); }
+#duel-log li.dim { color: var(--faint); }
+#duel-log .mi {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+#duel-log .mi .ico { width: 12px; height: 12px; }
+#duel-log .mi.fire { color: var(--el-fire); }
+#duel-log .mi.water { color: var(--el-water); }
+#duel-log .mi.electric { color: var(--el-electric); }
+#duel-log .mi.physical { color: var(--el-physical); }
+#duel-log .mi.poison { color: var(--el-poison); }
+#duel-log .mi.heal { color: var(--good); }
+#duel-log .mi.hp { color: var(--hp); }
 
-.duel-action { margin-top: 12px; }
-.duel-action h3 { margin: 0 0 10px; }
+.duel-action { margin-top: 14px; }
+.duel-action h3 { margin: 0 0 10px; font-family: var(--font-display); font-weight: 600; }
 
-.hand,
+.hand {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: 10px 0;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.hand .gcard { width: 152px; flex: none; }
+
 .plan-slots {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin: 10px 0;
 }
-
-.duel-card,
 .plan-slot {
+  --c: var(--border);
+  min-width: 150px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-top: 3px solid var(--c);
+  border-radius: 10px;
+  padding: 7px 10px 9px;
   background: var(--panel-2);
-  color: var(--text);
+  color: var(--muted);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.duel-card {
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-}
-.dc-desc {
-  margin: 6px 0 0;
-  font-size: 0.75rem;
-  line-height: 1.35;
-  color: var(--muted);
-}
-button.duel-card:hover:not(:disabled),
 .plan-slot:hover { border-color: var(--accent); }
-.duel-card:disabled { opacity: 0.35; cursor: default; }
-.dc-name { font-weight: 600; font-size: 0.9rem; }
-.dc-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
-.dc-sub { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
-
-.plan-slot { min-width: 140px; font-size: 0.85rem; color: var(--muted); }
+.plan-slot .ps-r {
+  font-size: 0.66rem;
+  color: var(--faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.plan-slot .ps-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+.plan-slot .ps-name .ico { width: 12px; height: 12px; color: var(--c); }
 .plan-slot[data-type] { color: var(--text); }
-
-.duel-card[data-type='specialBlock'],
-.plan-slot[data-type='specialBlock']     { border-left-color: #b57bff; }
-.duel-card[data-type='special'],
-.plan-slot[data-type='special']          { border-left-color: #7b8dff; }
-.duel-card[data-type='bonus'],
-.plan-slot[data-type='bonus']            { border-left-color: #55c98a; }
-.duel-card[data-type='defensive'],
-.plan-slot[data-type='defensive']        { border-left-color: #46c6c6; }
-.duel-card[data-type='elementalAttack'],
-.plan-slot[data-type='elementalAttack']  { border-left-color: #e0913a; }
-.duel-card[data-type='physicalAttack'],
-.plan-slot[data-type='physicalAttack']   { border-left-color: #d9534f; }
+.plan-slot[data-type='specialBlock']    { --c: var(--t-specialBlock); }
+.plan-slot[data-type='special']         { --c: var(--t-special); }
+.plan-slot[data-type='bonus']           { --c: var(--t-bonus); }
+.plan-slot[data-type='defensive']       { --c: var(--t-defensive); }
+.plan-slot[data-type='elementalAttack'] { --c: var(--t-elementalAttack); }
+.plan-slot[data-type='physicalAttack']  { --c: var(--t-physicalAttack); }
 
 .chat-form { display: flex; gap: 8px; }
 .chat-form input {
