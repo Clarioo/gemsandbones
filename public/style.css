@@ -253,23 +253,95 @@ h1 {
 .stat-group dd[data-el='electric'] { color: var(--el-electric); }
 
 /* ---- Deck ---- */
-.deck-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 14px;
+
+/* per-type distribution strip at the top of "My deck" */
+.deck-dist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 4px;
 }
-@media (max-width: 640px) {
-  .deck-cols { grid-template-columns: 1fr; }
+.deck-dist .dchip {
+  --c: var(--faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--c) 34%, var(--border));
+  background: color-mix(in srgb, var(--c) 12%, var(--panel-2));
+  color: var(--c);
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.col-title {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.deck-dist .dchip.empty {
+  --c: var(--faint);
+  opacity: 0.5;
+  font-weight: 400;
+}
+.deck-dist .dchip .ico { width: 12px; height: 12px; }
+
+/* sort control */
+.sort-ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
   color: var(--muted);
 }
-.card-list {
+.sort-ctl > span { margin-right: 2px; }
+.sort-ctl button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.sort-ctl button:hover { color: var(--text); border-color: var(--accent); }
+.sort-ctl button.is-active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+/* grouped card lists */
+.card-groups { display: flex; flex-direction: column; gap: 18px; margin-top: 14px; }
+.card-groups > .empty-note { color: var(--muted); font-size: 0.9rem; margin: 4px 0 0; }
+
+.type-group > h4 {
+  --c: var(--faint);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.type-group > h4 .ico { width: 15px; height: 15px; color: var(--c); }
+.type-group > h4 .tg-count {
+  margin-left: auto;
+  font-family: "Barlow", system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.type-group[data-type='specialBlock']    > h4 { --c: var(--t-specialBlock); }
+.type-group[data-type='special']         > h4 { --c: var(--t-special); }
+.type-group[data-type='bonus']           > h4 { --c: var(--t-bonus); }
+.type-group[data-type='defensive']       > h4 { --c: var(--t-defensive); }
+.type-group[data-type='elementalAttack'] > h4 { --c: var(--t-elementalAttack); }
+.type-group[data-type='physicalAttack']  > h4 { --c: var(--t-physicalAttack); }
+
+.card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
