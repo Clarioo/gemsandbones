@@ -195,6 +195,20 @@ test('Adrenaline buffs the NEXT round\'s attack, then expires', () => {
   assert.equal(buffed.dmg3, plain.dmg3, 'the buff is gone by round 3');
 });
 
+test('Focus buffs next round\'s elemental attack, not just physical', () => {
+  const fireDmgAfter = (r1) => {
+    const d = mkDuel(
+      { classId: 'mage', deck: deckWith('focus', 'firebolt') },
+      { classId: 'fencer', deck: deckWith('strike') },
+    );
+    openingResolve(d, plan5(r1, 'firebolt'), plan5('strike', 'strike'));
+    const before = d.players.B.hp;
+    duel.resolveRound(d, midRng); // round 2: the Mage's Firebolt
+    return before - d.players.B.hp;
+  };
+  assert.ok(fireDmgAfter('focus') > fireDmgAfter('strike'), 'Firebolt hits harder the round after Focus');
+});
+
 test('adjustPriority pre-pass does not break a plain round', () => {
   const d = mkDuel(
     { classId: 'mage', deck: deckWith('overload') },
