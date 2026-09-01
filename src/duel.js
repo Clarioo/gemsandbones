@@ -50,9 +50,9 @@ function rollInt(lo, hi, rng) {
   return lo + Math.floor(rng() * (hi - lo + 1));
 }
 
-/** Build a player's duel state from their character + chosen deck. */
-function makePlayerState({ userId, name, classId, level, deck }) {
-  const base = resolveStats({ classId, level });
+/** Build a player's duel state from their character + chosen deck + gear. */
+function makePlayerState({ userId, name, classId, level, deck, itemMods = [] }) {
+  const base = resolveStats({ classId, level, itemMods });
   return {
     userId,
     name,

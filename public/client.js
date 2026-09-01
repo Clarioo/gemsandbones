@@ -21,6 +21,11 @@ const logoutBtn = document.getElementById('logout-btn');
 const devToolsEl = document.getElementById('dev-tools');
 const levelNoteEl = document.getElementById('level-note');
 const changeClassBtn = document.getElementById('change-class');
+const equipSlotsEl = document.getElementById('equip-slots');
+const bagCountEl = document.getElementById('bag-count');
+const bagHintEl = document.getElementById('bag-hint');
+const bagListEl = document.getElementById('bag-list');
+const generateItemBtn = document.getElementById('generate-item');
 
 const tabsNav = document.querySelector('.tabs');
 const tabPanels = {
@@ -167,15 +172,17 @@ async function showApp(user) {
 
   if (!socket.connected) socket.connect();
 
-  // Dev-only tools: change class / set level by hand.
+  // Dev-only tools: change class / set level by hand / generate items.
   devToolsEl.hidden = !user.isDev;
   levelNoteEl.hidden = !user.isDev;
+  generateItemBtn.hidden = !user.isDev;
 
   if (user.character) {
     currentLocationId = user.character.locationId || null;
     if (!statDefs) statDefs = await fetch('/api/stats/definitions').then((r) => r.json());
     levelInput.value = user.character.level;
     renderSheet(user.character);
+    renderEquipment(user.character);
     loadDeck().catch((err) => console.error(err));
   }
 }
@@ -842,13 +849,229 @@ function renderSheet(character) {
       }
       const dd = document.createElement('dd');
       if (elm) dd.dataset.el = elm;
-      dd.textContent = character.stats[stat.id] ?? 0;
+      const val = character.stats[stat.id] ?? 0;
+      const base = (character.baseStats && character.baseStats[stat.id]) ?? val;
+      dd.textContent = val;
+      if (val > base) { dd.classList.add('geared'); dd.title = `${base} base + ${val - base} from gear`; }
+      else if (val < base) { dd.classList.add('nerfed'); dd.title = `${base} base − ${base - val} from gear`; }
       dl.append(dt, dd);
     }
     box.appendChild(dl);
     statGroupsEl.appendChild(box);
   }
 }
+
+// ---- Equipment (Character tab) -----------------------------------------
+const SLOT_ORDER = ['weapon', 'helmet', 'armor', 'boots', 'ring'];
+const SLOT_LABELS = {
+  weapon: 'Weapon', helmet: 'Helmet', armor: 'Armor', boots: 'Boots', ring: 'Ring',
+};
+
+const bagItemByUid = (character, uid) =>
+  (character.bag || []).find((i) => i.uid === uid) || null;
+
+function clientCanEquip(character, item) {
+  const okClass = item.classes === 'all' || item.classes.includes(character.classId);
+  const okLevel = (character.level || 1) >= ((item.requirements && item.requirements.level) || 1);
+  return { okClass, okLevel, ok: okClass && okLevel };
+}
+
+function statChip(stat, amount, isBonus) {
+  const s = document.createElement('span');
+  s.className = 'pchip' + (isBonus ? ' pchip--bonus' : '');
+  const sign = amount >= 0 ? '+' : '−';
+  s.textContent = `${sign}${Math.abs(amount)} ${statLabel(stat)}`;
+  if (isBonus) s.title = 'Random bonus';
+  return s;
+}
+
+function itemStatChips(item) {
+  const chips = [];
+  for (const [stat, amt] of Object.entries(item.stats || {})) chips.push(statChip(stat, amt, false));
+  for (const b of item.bonuses || []) chips.push(statChip(b.stat, b.amount, true));
+  return chips;
+}
+
+function durabilityBar(item) {
+  const d = item.durability || { current: 0, max: 100 };
+  const pct = d.max ? Math.max(0, Math.min(100, (d.current / d.max) * 100)) : 0;
+  const wrap = document.createElement('div');
+  wrap.className = 'dura';
+  const label = document.createElement('span');
+  label.className = 'dura-label';
+  label.textContent = d.current <= 0 ? 'Broken' : `${d.current}/${d.max}`;
+  const track = document.createElement('div');
+  track.className = 'dura-track';
+  const fill = document.createElement('div');
+  fill.className = 'dura-fill' + (d.current <= 0 ? ' broken' : pct < 25 ? ' low' : '');
+  fill.style.width = `${pct}%`;
+  track.append(fill);
+  wrap.append(label, track);
+  return wrap;
+}
+
+function renderEquipment(character) {
+  // -- slots --
+  equipSlotsEl.replaceChildren();
+  const equipment = character.equipment || {};
+  for (const slot of SLOT_ORDER) {
+    const item = equipment[slot] ? bagItemByUid(character, equipment[slot]) : null;
+    const el = document.createElement('div');
+    el.className = 'equip-slot' + (item ? '' : ' empty');
+    el.dataset.slot = slot;
+
+    const head = document.createElement('div');
+    head.className = 'es-slot';
+    head.textContent = SLOT_LABELS[slot];
+    el.append(head);
+
+    if (item) {
+      const name = document.createElement('div');
+      name.className = 'es-name';
+      name.textContent = item.name;
+      el.append(name);
+
+      const chips = document.createElement('div');
+      chips.className = 'es-chips';
+      chips.append(...itemStatChips(item));
+      el.append(chips, durabilityBar(item));
+      el.append(miniButton('Unequip', () =>
+        equipmentAction('/api/equipment/unequip', { slot })));
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'es-empty';
+      empty.textContent = 'Empty';
+      el.append(empty);
+    }
+    equipSlotsEl.append(el);
+  }
+
+  // -- bag --
+  const bag = character.bag || [];
+  const bagMax = character.bagMax || 30;
+  bagCountEl.textContent = `${bag.length} / ${bagMax}`;
+  bagCountEl.classList.toggle('warn', bag.length >= bagMax);
+
+  bagListEl.replaceChildren();
+  if (!bag.length) {
+    const p = document.createElement('p');
+    p.className = 'empty-note';
+    p.textContent = currentUser && currentUser.isDev
+      ? 'Bag is empty. Use "Generate item" to roll one.'
+      : 'Bag is empty.';
+    bagListEl.append(p);
+    return;
+  }
+  const equipped = new Set(Object.values(equipment).filter(Boolean));
+  for (const item of bag) bagListEl.append(bagCard(character, item, equipped));
+}
+
+function bagCard(character, item, equippedUids) {
+  const el = document.createElement('div');
+  el.className = 'item-card';
+  el.dataset.slot = item.slot;
+  const isEquipped = equippedUids.has(item.uid);
+  if (isEquipped) el.classList.add('is-equipped');
+
+  const head = document.createElement('div');
+  head.className = 'ic-head';
+  const name = document.createElement('span');
+  name.className = 'ic-name';
+  name.textContent = item.name;
+  const slot = document.createElement('span');
+  slot.className = 'ic-slot';
+  slot.textContent = SLOT_LABELS[item.slot] || item.slot;
+  head.append(name, slot);
+  el.append(head);
+
+  const chk = clientCanEquip(character, item);
+  const lvlNeed = (item.requirements && item.requirements.level) || 1;
+  const req = document.createElement('div');
+  req.className = 'ic-req';
+  const cls = document.createElement('span');
+  cls.textContent = item.classes === 'all' ? 'Any class' : item.classes.map(cap).join(' · ');
+  if (!chk.okClass) cls.className = 'unmet';
+  req.append(cls);
+  if (lvlNeed > 1) {
+    const lv = document.createElement('span');
+    lv.textContent = `Lvl ${lvlNeed}`;
+    if (!chk.okLevel) lv.className = 'unmet';
+    req.append(lv);
+  }
+  if (isEquipped) {
+    const w = document.createElement('span');
+    w.className = 'ic-worn';
+    w.textContent = 'Equipped';
+    req.append(w);
+  }
+  el.append(req);
+
+  const chips = document.createElement('div');
+  chips.className = 'ic-chips';
+  chips.append(...itemStatChips(item));
+  el.append(chips, durabilityBar(item));
+
+  const actions = document.createElement('div');
+  actions.className = 'ic-actions';
+  if (isEquipped) {
+    actions.append(miniButton('Unequip', () =>
+      equipmentAction('/api/equipment/unequip', { slot: item.slot })));
+  } else {
+    const eq = miniButton('Equip', () =>
+      equipmentAction('/api/equipment/equip', { uid: item.uid }));
+    eq.disabled = !chk.ok;
+    if (!chk.ok) eq.title = !chk.okClass ? 'Your class can’t use this' : `Requires level ${lvlNeed}`;
+    actions.append(eq);
+  }
+  const drop = miniButton('Drop', () => {
+    if (confirm(`Drop ${item.name}? This can’t be undone.`)) {
+      equipmentAction('/api/items/drop', { uid: item.uid });
+    }
+  });
+  actions.append(drop);
+  el.append(actions);
+  return el;
+}
+
+function equipErrorText(error) {
+  return {
+    wrong_class: 'Your class can’t wear that item.',
+    level_too_low: 'Your level is too low for that item.',
+    bag_full: 'Your bag is full (30 items). Drop something first.',
+    not_in_bag: 'That item isn’t in your bag.',
+    not_dev: 'Generating items is a dev-only tool.',
+    no_class: 'Pick a class first.',
+  }[error] || `Could not do that${error ? `: ${error}` : ''}.`;
+}
+
+function applyCharacterUpdate(character) {
+  currentUser.character = character;
+  bagHintEl.hidden = true;
+  levelInput.value = character.level;
+  renderSheet(character);
+  renderEquipment(character);
+}
+
+async function equipmentAction(url, body) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      bagHintEl.hidden = false;
+      bagHintEl.textContent = equipErrorText(e.error);
+      return;
+    }
+    applyCharacterUpdate((await res.json()).character);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+generateItemBtn.addEventListener('click', () => equipmentAction('/api/items/generate', {}));
 
 let levelTimer = null;
 levelInput.addEventListener('input', () => {

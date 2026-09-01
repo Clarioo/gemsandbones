@@ -30,8 +30,9 @@ const duelEngine = require('./duel');
 const duelBot = require('./duelBot');
 const { isDuelLegal, defaultDeckForClass } = require('./deck');
 const { CLASSES } = require('./classes');
+const { equippedItemMods } = require('./items');
 
-function createDuelHub(io, { getUserById }) {
+function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
   const queue = []; // userIds waiting
   const sockets = new Map(); // userId -> socket
   const duels = new Map(); // duelId -> duel
@@ -140,11 +141,14 @@ function createDuelHub(io, { getUserById }) {
         classId: character.classId,
         level: character.level || 1,
         deck: [...character.deck],
+        itemMods: equippedItemMods(character),
       });
       const duel = duelEngine.createDuel(id, mk(a), mk(b));
       duels.set(id, duel);
       userDuel.set(aId, id);
       userDuel.set(bId, id);
+      wearEquipped(aId);
+      wearEquipped(bId);
       armDuelTimer(duel);
       sendViews(duel, 'start');
     }
@@ -211,6 +215,7 @@ function createDuelHub(io, { getUserById }) {
       classId: c.character.classId,
       level: c.character.level || 1,
       deck: [...c.character.deck],
+      itemMods: equippedItemMods(c.character),
     };
     const bot = {
       userId: `bot:${crypto.randomUUID()}`,
@@ -225,6 +230,7 @@ function createDuelHub(io, { getUserById }) {
     duels.set(id, duel);
     userDuel.set(userId, id);
     botDuels.set(id, bot.userId);
+    wearEquipped(userId);
     armDuelTimer(duel);
     sendViews(duel, 'start');
     if (botAct(duel)) sendViews(duel, 'update');

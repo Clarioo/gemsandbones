@@ -269,6 +269,106 @@ h1 {
 .stat-group dd[data-el='fire']     { color: var(--el-fire); }
 .stat-group dd[data-el='water']    { color: var(--el-water); }
 .stat-group dd[data-el='electric'] { color: var(--el-electric); }
+.stat-group dd.geared { color: var(--good); }
+.stat-group dd.nerfed { color: var(--hp); }
+
+/* ---- Equipment ---- */
+.equip-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.equip-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.equip-slot.empty { opacity: 0.7; border-style: dashed; }
+.es-slot {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 700;
+}
+.es-name { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; }
+.es-empty { color: var(--faint); font-size: 0.85rem; }
+.es-chips, .ic-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.equip-slot .mini-btn { align-self: flex-start; }
+
+.bag-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.item-card {
+  --c: var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--c);
+  border-radius: 8px;
+}
+.item-card[data-slot='weapon'] { --c: var(--t-physicalAttack); }
+.item-card[data-slot='helmet'] { --c: var(--t-bonus); }
+.item-card[data-slot='armor']  { --c: var(--t-defensive); }
+.item-card[data-slot='boots']  { --c: var(--el-electric); }
+.item-card[data-slot='ring']   { --c: var(--t-special); }
+.item-card.is-equipped { box-shadow: 0 0 0 1px var(--accent) inset; }
+.ic-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ic-name { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; }
+.ic-slot {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  flex: none;
+}
+.ic-req { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.72rem; color: var(--muted); }
+.ic-req .unmet { color: var(--t-elementalAttack); font-weight: 700; }
+.ic-worn { color: var(--good); font-weight: 700; }
+.ic-actions { display: flex; gap: 6px; margin-top: 2px; }
+
+/* item stat chips: base stats neutral, random bonuses green */
+.es-chips .pchip,
+.ic-chips .pchip {
+  --c: var(--faint);
+  background: color-mix(in srgb, var(--faint) 14%, var(--panel-3));
+  color: var(--muted);
+}
+.es-chips .pchip--bonus,
+.ic-chips .pchip--bonus,
+.pchip--bonus {
+  background: color-mix(in srgb, var(--good) 18%, var(--panel-2));
+  color: var(--good);
+}
+
+.dura { display: flex; align-items: center; gap: 6px; }
+.dura-label {
+  font-size: 0.62rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+.dura-track {
+  flex: 1;
+  height: 4px;
+  background: var(--panel-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.dura-fill { height: 100%; background: var(--good); }
+.dura-fill.low { background: var(--t-elementalAttack); }
+.dura-fill.broken { background: var(--hp); }
 
 /* ---- Deck ---- */
 

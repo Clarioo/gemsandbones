@@ -15,6 +15,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { deckIsLegal, defaultDeckForClass } = require('./deck');
+const { SLOTS, BAG_MAX, itemUsableByClass } = require('./items');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
 
@@ -79,9 +80,19 @@ function ensureCharacter(user) {
       createdAt: new Date().toISOString(),
     };
   }
+  const c = user.character;
   // Backfill for characters created before `level` existed.
-  if (typeof user.character.level !== 'number') user.character.level = 1;
-  return user.character;
+  if (typeof c.level !== 'number') c.level = 1;
+  // Backfill equipment (added later).
+  if (!Array.isArray(c.bag)) c.bag = [];
+  if (!c.equipment || typeof c.equipment !== 'object') c.equipment = {};
+  for (const s of SLOTS) if (!(s in c.equipment)) c.equipment[s] = null;
+  return c;
+}
+
+/** Find an owned item by uid, or null. */
+function bagItem(character, uid) {
+  return (character.bag || []).find((i) => i.uid === uid) || null;
 }
 
 /** Set (or change) the character's class. Returns the character, or null. */
@@ -98,6 +109,12 @@ function setCharacterClass(userId, classId) {
   if (!Array.isArray(character.deck) || !character.deck.length ||
       !deckIsLegal(character.deck, classId)) {
     character.deck = defaultDeckForClass(classId);
+  }
+
+  // Unequip any gear the new class cannot wear.
+  for (const slot of SLOTS) {
+    const item = bagItem(character, character.equipment[slot]);
+    if (item && !itemUsableByClass(item, classId)) character.equipment[slot] = null;
   }
 
   save(data);
@@ -156,6 +173,81 @@ function setCharacterLocation(userId, locationId) {
   return character;
 }
 
+// ---------------------------------------------------------------------------
+// Equipment
+// ---------------------------------------------------------------------------
+
+/** Add a rolled item instance to the bag. { character } / { error, character }. */
+function addItemToBag(userId, item) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  if (character.bag.length >= BAG_MAX) return { error: 'bag_full', character };
+  character.bag.push(item);
+  save(data);
+  return { character };
+}
+
+/** Equip an owned item into its slot (caller validates class/level). */
+function equipItem(userId, uid) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  const item = bagItem(character, uid);
+  if (!item || !SLOTS.includes(item.slot)) return character;
+  character.equipment[item.slot] = uid;
+  save(data);
+  return character;
+}
+
+/** Clear a slot. */
+function unequipSlot(userId, slot) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  if (SLOTS.includes(slot)) character.equipment[slot] = null;
+  save(data);
+  return character;
+}
+
+/** Remove an item from the bag entirely (also unequips it). */
+function dropItem(userId, uid) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.bag = (character.bag || []).filter((i) => i.uid !== uid);
+  for (const slot of SLOTS) {
+    if (character.equipment[slot] === uid) character.equipment[slot] = null;
+  }
+  save(data);
+  return character;
+}
+
+/** Take `amount` durability off every equipped item (a duel was fought). */
+function wearEquipped(userId, amount = 1) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  for (const slot of SLOTS) {
+    const item = bagItem(character, character.equipment[slot]);
+    if (item && item.durability) {
+      item.durability.current = Math.max(0, item.durability.current - amount);
+    }
+  }
+  save(data);
+  return character;
+}
+
 module.exports = {
   upsertUser,
   getUserById,
@@ -164,4 +256,9 @@ module.exports = {
   setCharacterLevel,
   setCharacterLocation,
   setDeck,
+  addItemToBag,
+  equipItem,
+  unequipSlot,
+  dropItem,
+  wearEquipped,
 };
