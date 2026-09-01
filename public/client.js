@@ -876,20 +876,109 @@ function clientCanEquip(character, item) {
   return { okClass, okLevel, ok: okClass && okLevel };
 }
 
-function statChip(stat, amount, isBonus) {
-  const s = document.createElement('span');
-  s.className = 'pchip' + (isBonus ? ' pchip--bonus' : '');
-  const sign = amount >= 0 ? '+' : '−';
-  s.textContent = `${sign}${Math.abs(amount)} ${statLabel(stat)}`;
-  if (isBonus) s.title = 'Random bonus';
-  return s;
+const SLOT_ART = {
+  weapon: 'physicalAttack', helmet: 'defensive', armor: 'defensive',
+  boots: 'dexterity', ring: 'special',
+};
+
+/** An element glyph tucked inside a shield outline — for elemental DEFENSE. */
+function shieldElementIcon(el, size = 12) {
+  const wrap = document.createElement('span');
+  wrap.className = 'sh-ico';
+  wrap.style.color = `var(--el-${el})`;
+  wrap.append(icon('defensive', size));
+  const inner = icon(el, Math.round(size * 0.58));
+  inner.classList.add('sh-inner');
+  wrap.append(inner);
+  return wrap;
 }
 
-function itemStatChips(item) {
-  const chips = [];
-  for (const [stat, amt] of Object.entries(item.stats || {})) chips.push(statChip(stat, amt, false));
-  for (const b of item.bonuses || []) chips.push(statChip(b.stat, b.amount, true));
-  return chips;
+/** stat id -> how to label + icon it on an item. */
+function statMeta(statId) {
+  const M = {
+    attackMin: { icon: 'physicalAttack', label: 'Min Attack' },
+    attackMax: { icon: 'physicalAttack', label: 'Max Attack' },
+    defense: { icon: 'defensive', label: 'Defense' },
+    health: { icon: 'heart', label: 'Health' },
+    mana: { icon: 'mana', label: 'Mana' },
+    strength: { icon: 'strength', label: 'Strength' },
+    vitality: { icon: 'vitality', label: 'Vitality' },
+    intelligence: { icon: 'intelligence', label: 'Intelligence' },
+    dexterity: { icon: 'dexterity', label: 'Dexterity' },
+    fireAtkMin: { el: 'fire', label: 'Fire Attack' },
+    fireAtkMax: { el: 'fire', label: 'Fire Attack' },
+    waterAtkMin: { el: 'water', label: 'Water Attack' },
+    waterAtkMax: { el: 'water', label: 'Water Attack' },
+    electricAtkMin: { el: 'electric', label: 'Electric Attack' },
+    electricAtkMax: { el: 'electric', label: 'Electric Attack' },
+    fireDef: { shieldEl: 'fire', label: 'Fire Defense' },
+    waterDef: { shieldEl: 'water', label: 'Water Defense' },
+    electricDef: { shieldEl: 'electric', label: 'Electric Defense' },
+  };
+  return M[statId] || { label: statLabel(statId) };
+}
+
+function statMetaIcon(meta, size = 12) {
+  if (meta.shieldEl) return shieldElementIcon(meta.shieldEl, size);
+  if (meta.el) {
+    const ic = icon(meta.el, size);
+    ic.style.color = `var(--el-${meta.el})`;
+    return ic;
+  }
+  return meta.icon ? icon(meta.icon, size) : null;
+}
+
+function itemStatRow(meta, valueText, isBonus) {
+  const row = document.createElement('div');
+  row.className = 'istat' + (isBonus ? ' istat--bonus' : '');
+  const l = document.createElement('span');
+  l.className = 'istat-l';
+  const ic = statMetaIcon(meta);
+  if (ic) l.append(ic);
+  l.append(document.createTextNode(meta.label));
+  const v = document.createElement('span');
+  v.className = 'istat-v';
+  v.textContent = valueText;
+  if (isBonus) row.title = 'Random bonus';
+  row.append(l, v);
+  return row;
+}
+
+/** Vertical list of an item's stats: attack pairs as ranges, then bonuses. */
+function itemStatList(item) {
+  const wrap = document.createElement('div');
+  wrap.className = 'istats';
+  const stats = { ...(item.stats || {}) };
+
+  const PAIRS = [
+    ['attackMin', 'attackMax', { icon: 'physicalAttack', label: 'Attack' }],
+    ['fireAtkMin', 'fireAtkMax', { el: 'fire', label: 'Fire Attack' }],
+    ['waterAtkMin', 'waterAtkMax', { el: 'water', label: 'Water Attack' }],
+    ['electricAtkMin', 'electricAtkMax', { el: 'electric', label: 'Electric Attack' }],
+  ];
+  for (const [mn, mx, meta] of PAIRS) {
+    if (mn in stats || mx in stats) {
+      const lo = stats[mn] ?? stats[mx];
+      const hi = stats[mx] ?? stats[mn];
+      wrap.append(itemStatRow(meta, `${lo}–${hi}`, false));
+      delete stats[mn];
+      delete stats[mx];
+    }
+  }
+  for (const [stat, amt] of Object.entries(stats)) {
+    wrap.append(itemStatRow(statMeta(stat), `+${amt}`, false));
+  }
+  for (const b of item.bonuses || []) {
+    wrap.append(itemStatRow(statMeta(b.stat), `+${b.amount}`, true));
+  }
+  return wrap;
+}
+
+function itemArt(slot) {
+  const box = document.createElement('div');
+  box.className = 'ic-art';
+  box.append(icon(SLOT_ART[slot] || 'special', 30));
+  return box;
 }
 
 function durabilityBar(item) {
@@ -929,12 +1018,7 @@ function renderEquipment(character) {
       const name = document.createElement('div');
       name.className = 'es-name';
       name.textContent = item.name;
-      el.append(name);
-
-      const chips = document.createElement('div');
-      chips.className = 'es-chips';
-      chips.append(...itemStatChips(item));
-      el.append(chips, durabilityBar(item));
+      el.append(name, itemStatList(item), durabilityBar(item));
       el.append(miniButton('Unequip', () =>
         equipmentAction('/api/equipment/unequip', { slot })));
     } else {
@@ -982,7 +1066,14 @@ function bagCard(character, item, equippedUids) {
   slot.className = 'ic-slot';
   slot.textContent = SLOT_LABELS[item.slot] || item.slot;
   head.append(name, slot);
-  el.append(head);
+  el.append(head, itemArt(item.slot));
+
+  if (isEquipped) {
+    const w = document.createElement('div');
+    w.className = 'ic-worn';
+    w.textContent = 'Equipped';
+    el.append(w);
+  }
 
   const chk = clientCanEquip(character, item);
   const lvlNeed = (item.requirements && item.requirements.level) || 1;
@@ -998,18 +1089,7 @@ function bagCard(character, item, equippedUids) {
     if (!chk.okLevel) lv.className = 'unmet';
     req.append(lv);
   }
-  if (isEquipped) {
-    const w = document.createElement('span');
-    w.className = 'ic-worn';
-    w.textContent = 'Equipped';
-    req.append(w);
-  }
-  el.append(req);
-
-  const chips = document.createElement('div');
-  chips.className = 'ic-chips';
-  chips.append(...itemStatChips(item));
-  el.append(chips, durabilityBar(item));
+  el.append(req, itemStatList(item), durabilityBar(item));
 
   const actions = document.createElement('div');
   actions.className = 'ic-actions';
@@ -1323,10 +1403,11 @@ function statusChip(colorKey, iconName, text) {
 }
 
 /** One <dl> row. delta compares a live value to its base (you only). */
-function statRow(dl, { label, iconName, elClass, value, base }) {
+function statRow(dl, { label, iconName, shieldEl, elClass, value, base }) {
   const dt = document.createElement('dt');
   if (elClass) dt.className = elClass;
-  if (iconName) dt.append(icon(iconName, 12), document.createTextNode(' ' + label));
+  if (shieldEl) dt.append(shieldElementIcon(shieldEl, 12), document.createTextNode(' ' + label));
+  else if (iconName) dt.append(icon(iconName, 12), document.createTextNode(' ' + label));
   else dt.textContent = label;
   const dd = document.createElement('dd');
   dd.textContent = value;
@@ -1407,9 +1488,9 @@ function renderPlayerPanel(el, p, isYou, showElementalDef) {
   if (showElementalDef) {
     el.append(
       statGroup('Elemental defense', (dl) => {
-        statRow(dl, { label: 'Fire', iconName: 'fire', elClass: 'fire', value: st.fireDef, base: base.fireDef });
-        statRow(dl, { label: 'Water', iconName: 'water', elClass: 'water', value: st.waterDef, base: base.waterDef });
-        statRow(dl, { label: 'Electric', iconName: 'electric', elClass: 'elec', value: st.electricDef, base: base.electricDef });
+        statRow(dl, { label: 'Fire', shieldEl: 'fire', elClass: 'fire', value: st.fireDef, base: base.fireDef });
+        statRow(dl, { label: 'Water', shieldEl: 'water', elClass: 'water', value: st.waterDef, base: base.waterDef });
+        statRow(dl, { label: 'Electric', shieldEl: 'electric', elClass: 'elec', value: st.electricDef, base: base.electricDef });
       }),
     );
   }
