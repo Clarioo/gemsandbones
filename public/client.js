@@ -248,6 +248,88 @@ function cardElement(card) {
   return null;
 }
 
+// ---- Card preview: what a card will actually deal/reduce/heal -------------
+// `stats` is the acting player's live stats (attackMin/Max per element) --
+// duelState.you.stats in a duel, else the character sheet's base stats.
+// Numbers are the raw roll, before the opponent's defense/mitigation (those
+// aren't known outside a duel, and change round to round inside one).
+const elName = (el) => el.charAt(0).toUpperCase() + el.slice(1);
+
+function previewParts(card, stats) {
+  const parts = [];
+  for (const b of card.behaviour || []) {
+    if (b.kind === 'damage') {
+      if (!stats) continue;
+      const el = b.element || 'physical';
+      const lo = el === 'physical' ? stats.attackMin : stats[`${el}AtkMin`] || 0;
+      const hi = el === 'physical' ? stats.attackMax : stats[`${el}AtkMax`] || 0;
+      const scale = typeof b.scale === 'number' ? b.scale : 1;
+      parts.push({
+        kind: 'dmg',
+        el,
+        label: `${elName(el)} damage`,
+        text: `${Math.round(lo * scale)}–${Math.round(hi * scale)}`,
+      });
+      if (b.lifesteal) {
+        parts.push({ kind: 'lifesteal', label: 'Lifesteal', text: `${Math.round(b.lifesteal * 100)}%` });
+      }
+    } else if (b.kind === 'dot') {
+      const el = b.element || 'physical';
+      const per = Math.max(0, Math.round(b.damage || 0));
+      const dur = Math.max(1, Math.round(b.duration || 1));
+      parts.push({ kind: 'dot', el, label: `${elName(el)} DoT`, text: `${per}/rd × ${dur}` });
+    } else if (b.kind === 'heal') {
+      const amt = Math.max(0, Math.round(b.amount || 0));
+      parts.push({ kind: 'heal', label: b.target === 'opponent' ? 'Heal opponent' : 'Heal', text: `+${amt}` });
+    } else if (b.kind === 'mitigate') {
+      const bits = [];
+      if (b.flat) bits.push(`-${b.flat}`);
+      if (b.percent) bits.push(`-${b.percent}%`);
+      if (bits.length) parts.push({ kind: 'mitigate', label: 'Reduce dmg', text: bits.join(' ') });
+    }
+  }
+  return parts;
+}
+
+/** The acting player's live stats, for computing card previews. */
+function statsForPreview() {
+  if (duelState && duelState.you) return duelState.you.stats;
+  return currentUser && currentUser.character ? currentUser.character.stats : null;
+}
+
+function previewChip(part) {
+  const s = document.createElement('span');
+  s.className = 'pchip';
+  let iconName = null;
+  let colorVar = 'var(--muted)';
+  if (part.kind === 'dmg' || part.kind === 'dot') {
+    iconName = part.el;
+    colorVar = `var(--el-${part.el})`;
+  } else if (part.kind === 'heal') {
+    iconName = 'heal';
+    colorVar = 'var(--good)';
+  } else if (part.kind === 'lifesteal') {
+    iconName = 'heart';
+    colorVar = 'var(--hp)';
+  } else if (part.kind === 'mitigate') {
+    iconName = 'defensive';
+    colorVar = 'var(--t-defensive)';
+  }
+  s.style.setProperty('--c', colorVar);
+  if (iconName) s.append(icon(iconName, 10));
+  s.append(document.createTextNode(part.text));
+  s.title = `${part.label}: ${part.text}`;
+  return s;
+}
+
+/** Multi-line native tooltip: name/type/cost, description, computed numbers. */
+function cardTooltip(card, stats) {
+  const lines = [`${card.name} — ${typeName(card.type)}, ${card.manaCost} MP`, card.description];
+  const parts = previewParts(card, stats);
+  if (parts.length) lines.push(parts.map((p) => `${p.label}: ${p.text}`).join('  ·  '));
+  return lines.join('\n');
+}
+
 function renderDeck() {
   const counts = tally(deck);
   const total = deck.length;
@@ -434,6 +516,16 @@ function gameCard(cardOrId, opts = {}) {
   }
 
   body.append(typeRow, art, name, meta, rule);
+
+  if (card) {
+    const parts = previewParts(card, statsForPreview());
+    if (parts.length) {
+      const prow = document.createElement('div');
+      prow.className = 'gcard__preview';
+      prow.append(...parts.map(previewChip));
+      body.append(prow);
+    }
+  }
 
   const foot = document.createElement('div');
   foot.className = 'gcard__foot';
@@ -1030,6 +1122,7 @@ function queuedPlays() {
       const c = cardCatalog.get(cid);
       li.dataset.type = c.type;
       nm.append(icon(c.type, 12), document.createTextNode(c.name));
+      li.title = cardTooltip(c, v.you.stats);
     } else {
       li.classList.add('empty');
       nm.textContent = r === v.slotToFill ? 'choosing…' : '—';
@@ -1304,7 +1397,7 @@ function renderPlanBuilder() {
       const c = cardCatalog.get(cardId);
       slot.dataset.type = c.type;
       nm.append(icon(c.type, 12), document.createTextNode(c.name));
-      slot.title = `${c.name} — ${typeName(c.type)}, ${c.manaCost} MP\n${c.description}`;
+      slot.title = cardTooltip(c, v.you.stats);
     } else {
       nm.textContent = 'Empty';
     }
