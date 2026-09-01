@@ -28,6 +28,8 @@ const {
   defaultDeckForClass,
 } = require('./deck');
 const { createDuelHub } = require('./duelHub');
+const { createLocationHub } = require('./locationHub');
+const { LOCATIONS, toPublicLocation } = require('./locations');
 
 const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
 
@@ -169,6 +171,11 @@ app.post('/api/character/class', requireAuth, (req, res) => {
   res.json({ character: toPublicCharacter(character) });
 });
 
+/** The world map: places a player can travel to and fight in. */
+app.get('/api/locations', (req, res) => {
+  res.json({ locations: LOCATIONS.map(toPublicLocation) });
+});
+
 /** The stat categories + labels, for rendering the character sheet. */
 app.get('/api/stats/definitions', (req, res) => {
   res.json({ groups: STAT_GROUPS });
@@ -274,6 +281,10 @@ function toPublicCharacter(c) {
 io.engine.use(sessionMiddleware);
 
 const duelHub = createDuelHub(io, { getUserById });
+const locationHub = createLocationHub(io, {
+  getUserById,
+  startBotDuel: duelHub.startBotDuel,
+});
 
 io.on('connection', (socket) => {
   const session = socket.request.session;
@@ -294,6 +305,7 @@ io.on('connection', (socket) => {
   broadcastPlayerCount();
 
   duelHub.onConnection(socket, user);
+  locationHub.onConnection(socket, user);
 
   socket.on('chat', (text) => {
     if (typeof text !== 'string') return;
@@ -309,6 +321,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     duelHub.onDisconnect(user.id);
+    locationHub.onDisconnect(user.id);
     socket.broadcast.emit('system', `${shownName} left the lobby`);
     broadcastPlayerCount();
   });

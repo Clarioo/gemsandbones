@@ -22,6 +22,7 @@ const tabsNav = document.querySelector('.tabs');
 const tabPanels = {
   character: document.getElementById('tab-character'),
   deck: document.getElementById('tab-deck'),
+  map: document.getElementById('tab-map'),
   lobby: document.getElementById('tab-lobby'),
 };
 const deckCountEl = document.getElementById('deck-count');
@@ -31,6 +32,9 @@ const deckListEl = document.getElementById('deck-list');
 const poolListEl = document.getElementById('pool-list');
 const poolSortEl = document.getElementById('pool-sort');
 const deckResetBtn = document.getElementById('deck-reset');
+
+const locationListEl = document.getElementById('location-list');
+const mapHereEl = document.getElementById('map-here');
 
 const findDuelBtn = document.getElementById('find-duel');
 const practiceDuelBtn = document.getElementById('practice-duel');
@@ -55,6 +59,10 @@ let cardTypes = null;   // [{ id, name, basePriority }] highest first
 let deckLimits = null;  // { min, max, maxCopies }
 let deck = [];           // array of card ids (repeats = copies)
 let poolSort = 'type';   // 'type' | 'name' | 'mana'
+
+// map state
+let locations = null;        // [{ id, name, blurb, enemyLevels, requirements }]
+let currentLocationId = null; // location the player is currently in, or null
 
 async function init() {
   try {
@@ -160,6 +168,7 @@ function selectTab(name) {
   }
   for (const [key, panel] of Object.entries(tabPanels)) panel.hidden = key !== name;
   if (name === 'deck') requestAnimationFrame(fitDeckLayout);
+  if (name === 'map') loadMap().catch((err) => console.error(err));
 }
 
 /**
@@ -513,6 +522,92 @@ poolSortEl.addEventListener('click', (e) => {
   renderDeck();
 });
 
+// ---- Map --------------------------------------------------------------
+async function loadMap() {
+  if (!locations) {
+    const j = await fetch('/api/locations').then((r) => r.json());
+    locations = j.locations || [];
+  }
+  renderMap();
+}
+
+function renderMap() {
+  if (!locations) return;
+
+  const here = locations.find((l) => l.id === currentLocationId) || null;
+  mapHereEl.hidden = !here;
+  if (here) mapHereEl.textContent = `You are in: ${here.name}`;
+
+  locationListEl.replaceChildren();
+  for (const loc of locations) {
+    const inHere = loc.id === currentLocationId;
+    const card = document.createElement('div');
+    card.className = 'location-card' + (inHere ? ' is-here' : '');
+
+    const h = document.createElement('h3');
+    h.textContent = loc.name;
+
+    const lvl = document.createElement('span');
+    lvl.className = 'pill';
+    lvl.textContent = `Enemies Lvl ${loc.enemyLevels.min}–${loc.enemyLevels.max}`;
+    h.append(lvl);
+
+    const blurb = document.createElement('p');
+    blurb.textContent = loc.blurb;
+
+    const actions = document.createElement('div');
+    actions.className = 'location-actions';
+    if (inHere) {
+      const seek = document.createElement('button');
+      seek.className = 'btn discord';
+      seek.textContent = 'Search for an enemy';
+      seek.addEventListener('click', () => {
+        duelReturnTab = 'map';
+        socket.emit('location:seek');
+      });
+      const leave = document.createElement('button');
+      leave.className = 'btn ghost';
+      leave.textContent = 'Leave';
+      leave.addEventListener('click', () => socket.emit('location:leave'));
+      actions.append(seek, leave);
+    } else {
+      const enter = document.createElement('button');
+      enter.className = 'btn';
+      enter.textContent = 'Travel here';
+      enter.addEventListener('click', () => socket.emit('location:enter', { locationId: loc.id }));
+      actions.append(enter);
+    }
+
+    const note = document.createElement('p');
+    note.className = 'hint location-note';
+
+    card.append(h, blurb, actions, note);
+    locationListEl.append(card);
+  }
+}
+
+function mapNote(text) {
+  const el = locationListEl.querySelector('.is-here .location-note')
+    || locationListEl.querySelector('.location-note');
+  if (el) el.textContent = text;
+}
+
+socket.on('location:state', ({ locationId }) => {
+  currentLocationId = locationId || null;
+  if (!tabPanels.map.hidden) renderMap();
+});
+
+socket.on('location:error', ({ error }) => {
+  const map = {
+    no_class: 'Pick a class first.',
+    unknown_location: 'That place does not exist.',
+    not_in_location: 'Travel to a location first.',
+    already_in_duel: 'You are already in a duel.',
+    deck_not_duel_legal: `Your deck needs at least ${deckLimits ? deckLimits.min : 15} cards to fight. Edit it on the Deck tab.`,
+  };
+  mapNote(map[error] || `Map error: ${error}`);
+});
+
 const PRIMARY_STATS = ['strength', 'vitality', 'intelligence', 'dexterity'];
 function elementOfStat(id) {
   if (id.startsWith('fire')) return 'fire';
@@ -632,6 +727,7 @@ logoutBtn.addEventListener('click', async () => {
 // ---- Duel ---------------------------------------------------------------
 const PLAN_AHEAD = 5; // rounds planned ahead (matches the server)
 let duelState = null;
+let duelReturnTab = 'lobby'; // tab to show after leaving a duel
 let planSlots = [null, null, null, null, null];
 let pendingCard = null; // card chosen for the far slot, not yet accepted
 
@@ -659,12 +755,14 @@ function duelErrorText(error) {
 findDuelBtn.addEventListener('click', () => {
   ensureCatalog().catch(() => {});
   duelCtaNote.textContent = '';
+  duelReturnTab = 'lobby';
   socket.emit('duel:find');
 });
 
 practiceDuelBtn.addEventListener('click', () => {
   ensureCatalog().catch(() => {});
   duelCtaNote.textContent = '';
+  duelReturnTab = 'lobby';
   socket.emit('duel:practice');
 });
 
@@ -684,7 +782,8 @@ duelLeaveBtn.addEventListener('click', () => {
 function backToLobby() {
   duelState = null;
   showOnly(appView);
-  selectTab('lobby');
+  selectTab(duelReturnTab);
+  duelReturnTab = 'lobby';
 }
 
 function tickDuelTimer() {
