@@ -17,6 +17,11 @@ const {
   setCharacterLevel,
   setCharacterLocation,
   setDeck,
+  addItemToBag,
+  equipItem,
+  unequipSlot,
+  dropItem,
+  wearEquipped,
 } = require('./db');
 const { CLASSES, isValidClassId, getClass } = require('./classes');
 const { STAT_GROUPS, resolveStats } = require('./stats');
@@ -32,6 +37,13 @@ const { createDuelHub } = require('./duelHub');
 const { createLocationHub } = require('./locationHub');
 const { LOCATIONS, toPublicLocation } = require('./locations');
 const { isDevUser } = require('./devs');
+const {
+  SLOTS,
+  BAG_MAX,
+  rollRandomItem,
+  canEquip,
+  equippedItemMods,
+} = require('./items');
 
 const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
 
@@ -254,6 +266,55 @@ app.post('/api/deck/reset', requireAuth, (req, res) => {
   res.json({ deck: character.deck });
 });
 
+// ---------------------------------------------------------------------------
+// Equipment
+// ---------------------------------------------------------------------------
+
+/** DEV ONLY: roll a random item and drop it in the bag. */
+app.post('/api/items/generate', requireAuth, (req, res) => {
+  if (!isDevUser(req.user)) return res.status(403).json({ error: 'not_dev' });
+  const ch = req.user.character;
+  if (!ch || !ch.classId) return res.status(409).json({ error: 'no_class' });
+
+  const item = rollRandomItem();
+  const result = addItemToBag(req.user.id, item);
+  if (result.error) {
+    return res.status(400).json({ error: result.error, bagMax: BAG_MAX });
+  }
+  res.json({ item, character: toPublicCharacter(result.character) });
+});
+
+/** Equip an owned item into its slot. Body: { uid }. */
+app.post('/api/equipment/equip', requireAuth, (req, res) => {
+  const ch = req.user.character;
+  if (!ch || !ch.classId) return res.status(409).json({ error: 'no_class' });
+
+  const item = (ch.bag || []).find((i) => i.uid === (req.body && req.body.uid));
+  if (!item) return res.status(404).json({ error: 'not_in_bag' });
+
+  const check = canEquip(ch, item);
+  if (!check.ok) return res.status(400).json({ error: check.error });
+
+  const character = equipItem(req.user.id, item.uid);
+  res.json({ character: toPublicCharacter(character) });
+});
+
+/** Clear a slot. Body: { slot }. */
+app.post('/api/equipment/unequip', requireAuth, (req, res) => {
+  const slot = req.body && req.body.slot;
+  if (!SLOTS.includes(slot)) return res.status(400).json({ error: 'bad_slot' });
+  const character = unequipSlot(req.user.id, slot);
+  res.json({ character: toPublicCharacter(character) });
+});
+
+/** Remove an item from the bag entirely. Body: { uid }. */
+app.post('/api/items/drop', requireAuth, (req, res) => {
+  const uid = req.body && req.body.uid;
+  if (!uid) return res.status(400).json({ error: 'missing_uid' });
+  const character = dropItem(req.user.id, uid);
+  res.json({ character: toPublicCharacter(character) });
+});
+
 /** Only expose safe, display-oriented fields to the browser. */
 function toPublicUser(u) {
   const avatarUrl = u.avatar
@@ -281,9 +342,14 @@ function toPublicCharacter(c) {
     level,
     locationId: c.locationId || null,
     deckSize: Array.isArray(c.deck) ? c.deck.length : 0,
-    // Base stats for now. Once items/equipment exist, pass their modifiers
-    // into resolveStats() here as itemMods.
-    stats: resolveStats({ classId: c.classId, level }),
+    stats: resolveStats({ classId: c.classId, level, itemMods: equippedItemMods(c) }),
+    baseStats: resolveStats({ classId: c.classId, level }),
+    bag: Array.isArray(c.bag) ? c.bag : [],
+    bagMax: BAG_MAX,
+    equipment: SLOTS.reduce(
+      (o, s) => ({ ...o, [s]: (c.equipment && c.equipment[s]) || null }),
+      {},
+    ),
   };
 }
 
@@ -292,7 +358,7 @@ function toPublicCharacter(c) {
 // ---------------------------------------------------------------------------
 io.engine.use(sessionMiddleware);
 
-const duelHub = createDuelHub(io, { getUserById });
+const duelHub = createDuelHub(io, { getUserById, wearEquipped });
 const locationHub = createLocationHub(io, {
   getUserById,
   setCharacterLocation,
