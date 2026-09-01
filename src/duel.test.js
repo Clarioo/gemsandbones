@@ -170,6 +170,31 @@ test('dot ticks for its duration, ignores armour, then expires', () => {
   assert.equal(d.players.B.dots.length, 0, 'poison expired');
 });
 
+test('Adrenaline buffs the NEXT round\'s attack, then expires', () => {
+  // Play `r1` in round 1, then Strike in rounds 2 and 3. Measure the damage
+  // Alice's Strike does to Bob each round.
+  const run = (r1) => {
+    const d = mkDuel(
+      { classId: 'fencer', deck: deckWith('adrenaline') },
+      { classId: 'fencer', deck: deckWith('strike') },
+    );
+    openingResolve(d, plan5(r1), plan5('strike')); // round 1
+    const before2 = d.players.B.hp;
+    duel.resolveRound(d, midRng); // round 2
+    const dmg2 = before2 - d.players.B.hp;
+    const before3 = d.players.B.hp;
+    duel.resolveRound(d, midRng); // round 3
+    const dmg3 = before3 - d.players.B.hp;
+    return { dmg2, dmg3 };
+  };
+
+  const buffed = run('adrenaline');
+  const plain = run('strike');
+
+  assert.ok(buffed.dmg2 > plain.dmg2, 'round 2 Strike hits harder after Adrenaline');
+  assert.equal(buffed.dmg3, plain.dmg3, 'the buff is gone by round 3');
+});
+
 test('adjustPriority pre-pass does not break a plain round', () => {
   const d = mkDuel(
     { classId: 'mage', deck: deckWith('overload') },

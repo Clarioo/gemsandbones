@@ -25,8 +25,11 @@
  *   mana is still spent.
  * - `dot` (damage over time) ticks at the START of each of the next N rounds
  *   and ignores defense and mitigation.
- * - Stat changes from cards last only for this duel (round- or duel-scoped) and
- *   never touch the saved character.
+ * - Stat changes from cards last only for this duel and never touch the saved
+ *   character. Scope is 'round' (the round the card resolves in -- for defensive
+ *   buffs), 'nextRound' (the following round, when your next card plays -- for
+ *   attack buffs like Focus/Adrenaline, since you can't attack the same round
+ *   you buff), or 'duel' (permanent for the match).
  * - Ends when: a player's HP hits 0, a player leaves, or all 15 rounds resolve
  *   (higher HP wins; equal HP is a draw).
  */
@@ -278,14 +281,27 @@ function applyBehaviour(beh, play, ctx) {
     }
     case 'modifyStat': {
       const who = beh.target === 'opponent' ? target : actor;
+      // 'round'     -> only the round this card resolves in (defensive buffs:
+      //                you can't also play an attack this round, so an
+      //                attack buff here would do nothing -- use 'nextRound').
+      // 'nextRound' -> the following round, when your next card actually plays.
+      // 'duel'      -> the rest of the duel.
+      const untilRound =
+        beh.duration === 'duel' ? Infinity
+        : beh.duration === 'nextRound' ? round + 1
+        : round;
       who.effects.push({
         stat: beh.stat,
         amount: beh.amount,
         scope: beh.duration === 'duel' ? 'duel' : 'round',
-        untilRound: beh.duration === 'duel' ? Infinity : round,
+        untilRound,
       });
       const sign = beh.amount >= 0 ? '+' : '';
-      log.push(`${who.name}: ${sign}${beh.amount} ${beh.stat} (${beh.duration === 'duel' ? 'this duel' : 'this round'})`);
+      const when =
+        beh.duration === 'duel' ? 'this duel'
+        : beh.duration === 'nextRound' ? 'next round'
+        : 'this round';
+      log.push(`${who.name}: ${sign}${beh.amount} ${beh.stat} (${when})`);
       break;
     }
     case 'blockCard': {

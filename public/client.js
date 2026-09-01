@@ -250,10 +250,26 @@ function cardElement(card) {
 
 // ---- Card preview: what a card will actually deal/reduce/heal -------------
 // `stats` is the acting player's live stats (attackMin/Max per element) --
-// duelState.you.stats in a duel, else the character sheet's base stats.
-// Numbers are the raw roll, before the opponent's defense/mitigation (those
-// aren't known outside a duel, and change round to round inside one).
+// duelState.you.stats in a duel, else the character sheet's resolved stats.
+// The chip number is the RAW roll (attack × scale). The opponent's defense
+// and any Mitigate are applied when the card resolves — they aren't known
+// outside a duel and change round to round inside one — so they only appear
+// in the formula text, not the number.
 const elName = (el) => el.charAt(0).toUpperCase() + el.slice(1);
+
+/** Human name for a stat id, from the stat definitions (falls back to the id). */
+function statLabel(id) {
+  if (statDefs && statDefs.groups) {
+    for (const g of statDefs.groups) {
+      const s = g.stats.find((x) => x.id === id);
+      if (s) return s.name;
+    }
+  }
+  return id;
+}
+
+const whenLabel = (dur) =>
+  dur === 'duel' ? 'the rest of the duel' : dur === 'nextRound' ? 'next round' : 'this round';
 
 function previewParts(card, stats) {
   const parts = [];
@@ -264,28 +280,81 @@ function previewParts(card, stats) {
       const lo = el === 'physical' ? stats.attackMin : stats[`${el}AtkMin`] || 0;
       const hi = el === 'physical' ? stats.attackMax : stats[`${el}AtkMax`] || 0;
       const scale = typeof b.scale === 'number' ? b.scale : 1;
+      const rlo = Math.round(lo * scale);
+      const rhi = Math.round(hi * scale);
+      const atkWord = el === 'physical' ? 'Attack' : `${elName(el)} Attack`;
+      const defWord = el === 'physical' ? 'Defense' : `${elName(el)} Defense`;
       parts.push({
         kind: 'dmg',
         el,
         label: `${elName(el)} damage`,
-        text: `${Math.round(lo * scale)}–${Math.round(hi * scale)}`,
+        text: `${rlo}–${rhi}`,
+        formula:
+          `${elName(el)} damage: your ${atkWord} (${Math.round(lo)}–${Math.round(hi)}) × ${scale} scale ` +
+          `= ${rlo}–${rhi}, then minus the target's ${defWord} (and any Mitigate) when it resolves`,
       });
       if (b.lifesteal) {
-        parts.push({ kind: 'lifesteal', label: 'Lifesteal', text: `${Math.round(b.lifesteal * 100)}%` });
+        const pct = Math.round(b.lifesteal * 100);
+        parts.push({
+          kind: 'lifesteal',
+          label: 'Lifesteal',
+          text: `${pct}%`,
+          formula: `Lifesteal: heals you for ${pct}% of the damage this hit actually deals (after the target's defense)`,
+        });
       }
     } else if (b.kind === 'dot') {
       const el = b.element || 'physical';
       const per = Math.max(0, Math.round(b.damage || 0));
       const dur = Math.max(1, Math.round(b.duration || 1));
-      parts.push({ kind: 'dot', el, label: `${elName(el)} DoT`, text: `${per}/rd × ${dur}` });
+      parts.push({
+        kind: 'dot',
+        el,
+        label: `${elName(el)} DoT`,
+        text: `${per}/rd × ${dur}`,
+        formula:
+          `${elName(el)} damage over time: ${per} flat at the start of each of the next ${dur} rounds ` +
+          `(${per * dur} total) — ignores Defense and Mitigate`,
+      });
     } else if (b.kind === 'heal') {
       const amt = Math.max(0, Math.round(b.amount || 0));
-      parts.push({ kind: 'heal', label: b.target === 'opponent' ? 'Heal opponent' : 'Heal', text: `+${amt}` });
+      const who = b.target === 'opponent' ? 'the opponent' : 'you';
+      parts.push({
+        kind: 'heal',
+        label: b.target === 'opponent' ? 'Heal opponent' : 'Heal',
+        text: `+${amt}`,
+        formula: `Heal: restores ${amt} HP flat to ${who} (does not scale with stats), capped at max HP`,
+      });
     } else if (b.kind === 'mitigate') {
       const bits = [];
-      if (b.flat) bits.push(`-${b.flat}`);
-      if (b.percent) bits.push(`-${b.percent}%`);
-      if (bits.length) parts.push({ kind: 'mitigate', label: 'Reduce dmg', text: bits.join(' ') });
+      const words = [];
+      if (b.flat) { bits.push(`-${b.flat}`); words.push(`${b.flat} flat`); }
+      if (b.percent) {
+        const eff = Math.min(90, b.percent); // engine caps stacked percent mitigation at 90%
+        bits.push(`-${eff}%`);
+        words.push(b.percent > 90 ? `${eff}% (card lists ${b.percent}%, capped)` : `${b.percent}%`);
+      }
+      if (bits.length) {
+        parts.push({
+          kind: 'mitigate',
+          label: 'Reduce dmg',
+          text: bits.join(' '),
+          formula: `Mitigate: incoming damage this round is reduced by ${words.join(' and ')}`,
+        });
+      }
+    } else if (b.kind === 'modifyStat') {
+      const sign = b.amount >= 0 ? '+' : '';
+      const name = statLabel(b.stat);
+      const short = name.replace(/^Attack /, '').replace(/ Attack$/, '');
+      const who = b.target === 'opponent' ? "the opponent's" : 'your';
+      const when = whenLabel(b.duration);
+      parts.push({
+        kind: b.amount >= 0 ? 'buff' : 'debuff',
+        label: `${name} ${sign}${b.amount}`,
+        text: `${short} ${sign}${b.amount}`,
+        formula:
+          `${sign}${b.amount} to ${who} ${name}, applies ${when}` +
+          (b.duration === 'nextRound' ? ' — play it the round before you attack' : ''),
+      });
     }
   }
   return parts;
@@ -314,19 +383,24 @@ function previewChip(part) {
   } else if (part.kind === 'mitigate') {
     iconName = 'defensive';
     colorVar = 'var(--t-defensive)';
+  } else if (part.kind === 'buff' || part.kind === 'debuff') {
+    iconName = 'bonus';
+    colorVar = part.kind === 'buff' ? 'var(--t-bonus)' : 'var(--t-physicalAttack)';
   }
   s.style.setProperty('--c', colorVar);
   if (iconName) s.append(icon(iconName, 10));
   s.append(document.createTextNode(part.text));
-  s.title = `${part.label}: ${part.text}`;
+  s.title = part.formula || `${part.label}: ${part.text}`;
   return s;
 }
 
-/** Multi-line native tooltip: name/type/cost, description, computed numbers. */
+/**
+ * Multi-line native tooltip: name/type/cost, the flavour line, then one line
+ * per effect spelling out how its number is calculated.
+ */
 function cardTooltip(card, stats) {
   const lines = [`${card.name} — ${typeName(card.type)}, ${card.manaCost} MP`, card.description];
-  const parts = previewParts(card, stats);
-  if (parts.length) lines.push(parts.map((p) => `${p.label}: ${p.text}`).join('  ·  '));
+  for (const p of previewParts(card, stats)) lines.push(`• ${p.formula || `${p.label}: ${p.text}`}`);
   return lines.join('\n');
 }
 
@@ -564,6 +638,8 @@ function gameCard(cardOrId, opts = {}) {
     right.textContent = opts.sub || '';
     foot.append(left, right);
   }
+
+  if (card) el.title = cardTooltip(card, statsForPreview());
 
   el.append(strip, mana, body, foot);
   return el;

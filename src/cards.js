@@ -58,7 +58,13 @@ const CARD_TYPE_IDS = CARD_TYPES.map((t) => t.id);
  *   { kind: 'mitigate', percent?: number, flat?: number }   // this round, on the actor
  *
  *   { kind: 'modifyStat', stat: <statId>, amount: number,
- *                         target: 'self'|'opponent', duration: 'round'|'duel' }
+ *                         target: 'self'|'opponent',
+ *                         duration: 'round'|'nextRound'|'duel' }
+ *                     // 'round'     = the round this card resolves in (defensive
+ *                     //   buffs -- you can't also attack this round)
+ *                     // 'nextRound' = the following round, when your next card
+ *                     //   plays (attack buffs like Focus / Adrenaline)
+ *                     // 'duel'      = permanent for the match
  *
  *   { kind: 'blockCard', scope: 'thisRound'|'nextRound',
  *                        filter?: { types: <typeId>[] } }  // no filter = matches anything
@@ -198,8 +204,8 @@ const CARDS = [
     manaCost: 4,
     classes: 'all',
     graphic: '/cards/focus.png',
-    description: 'Sharpen your aim. Raises max attack for the round.',
-    behaviour: [{ kind: 'modifyStat', stat: 'attackMax', amount: 6, target: 'self', duration: 'round' }],
+    description: 'Sharpen your aim — raises your max attack next round.',
+    behaviour: [{ kind: 'modifyStat', stat: 'attackMax', amount: 6, target: 'self', duration: 'nextRound' }],
   },
   {
     id: 'adrenaline',
@@ -208,10 +214,10 @@ const CARDS = [
     manaCost: 6,
     classes: ['fencer', 'hunter'],
     graphic: '/cards/adrenaline.png',
-    description: 'A rush of energy. Raises min and max attack for the round.',
+    description: 'A rush of energy — raises your min and max attack next round.',
     behaviour: [
-      { kind: 'modifyStat', stat: 'attackMin', amount: 4, target: 'self', duration: 'round' },
-      { kind: 'modifyStat', stat: 'attackMax', amount: 4, target: 'self', duration: 'round' },
+      { kind: 'modifyStat', stat: 'attackMin', amount: 4, target: 'self', duration: 'nextRound' },
+      { kind: 'modifyStat', stat: 'attackMax', amount: 4, target: 'self', duration: 'nextRound' },
     ],
   },
 
