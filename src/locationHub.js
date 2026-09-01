@@ -5,9 +5,11 @@
  * searching that location for an AI enemy (which hands off to duelHub to start
  * a bot duel).
  *
- * "In a location" is transient presence, like being in the lobby: it lives in
- * memory only and is dropped on disconnect. Entering a duel does NOT remove you
- * from the location — when the duel ends you are still standing there.
+ * The current location is stored on the character (db.js), so a page reload or
+ * a server restart keeps you where you were. Entering a duel does NOT move you
+ * out of the location — when the duel ends you are still standing there.
+ * (Travel is free and unrestricted for now; level gates / travel costs come
+ * later.)
  *
  * Socket events in (all prefixed `location:`):
  *   enter  { locationId }   travel to a location
@@ -21,41 +23,44 @@
 
 const { getLocation, rollEnemy } = require('./locations');
 
-function createLocationHub(io, { getUserById, startBotDuel }) {
+function createLocationHub(io, { getUserById, setCharacterLocation, startBotDuel }) {
   const sockets = new Map(); // userId -> socket
-  const inLocation = new Map(); // userId -> locationId
+
+  const characterOf = (userId) => {
+    const user = getUserById(userId);
+    return user && user.character && user.character.classId ? user.character : null;
+  };
+
+  const locationIdOf = (userId) => {
+    const c = characterOf(userId);
+    return c ? c.locationId || null : null;
+  };
 
   const sendState = (userId) => {
     const s = sockets.get(userId);
-    if (s) s.emit('location:state', { locationId: inLocation.get(userId) || null });
+    if (s) s.emit('location:state', { locationId: locationIdOf(userId) });
   };
-
-  function hasCharacter(userId) {
-    const user = getUserById(userId);
-    return !!(user && user.character && user.character.classId);
-  }
 
   function onConnection(socket, user) {
     const userId = user.id;
     sockets.set(userId, socket);
-    sendState(userId); // in case of a reconnect while still placed
+    sendState(userId); // tell the client where they left off
 
     socket.on('location:enter', ({ locationId } = {}) => {
-      if (!hasCharacter(userId)) return socket.emit('location:error', { error: 'no_class' });
+      if (!characterOf(userId)) return socket.emit('location:error', { error: 'no_class' });
       const loc = getLocation(locationId);
       if (!loc) return socket.emit('location:error', { error: 'unknown_location' });
-      inLocation.set(userId, loc.id);
+      setCharacterLocation(userId, loc.id);
       sendState(userId);
     });
 
     socket.on('location:leave', () => {
-      inLocation.delete(userId);
+      if (characterOf(userId)) setCharacterLocation(userId, null);
       sendState(userId);
     });
 
     socket.on('location:seek', () => {
-      const locId = inLocation.get(userId);
-      const loc = locId && getLocation(locId);
+      const loc = getLocation(locationIdOf(userId));
       if (!loc) return socket.emit('location:error', { error: 'not_in_location' });
 
       const enemy = rollEnemy(loc);
@@ -69,8 +74,8 @@ function createLocationHub(io, { getUserById, startBotDuel }) {
   }
 
   function onDisconnect(userId) {
-    inLocation.delete(userId);
     sockets.delete(userId);
+    // location is persisted on the character — nothing to clear here
   }
 
   return { onConnection, onDisconnect };

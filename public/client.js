@@ -23,7 +23,7 @@ const tabPanels = {
   character: document.getElementById('tab-character'),
   deck: document.getElementById('tab-deck'),
   map: document.getElementById('tab-map'),
-  lobby: document.getElementById('tab-lobby'),
+  chat: document.getElementById('tab-chat'),
 };
 const deckCountEl = document.getElementById('deck-count');
 const deckHintEl = document.getElementById('deck-hint');
@@ -35,6 +35,7 @@ const deckResetBtn = document.getElementById('deck-reset');
 
 const locationListEl = document.getElementById('location-list');
 const mapHereEl = document.getElementById('map-here');
+const practiceNoteEl = document.getElementById('practice-note');
 
 const findDuelBtn = document.getElementById('find-duel');
 const practiceDuelBtn = document.getElementById('practice-duel');
@@ -149,6 +150,7 @@ async function showApp(user) {
   if (!socket.connected) socket.connect();
 
   if (user.character) {
+    currentLocationId = user.character.locationId || null;
     if (!statDefs) statDefs = await fetch('/api/stats/definitions').then((r) => r.json());
     levelInput.value = user.character.level;
     renderSheet(user.character);
@@ -727,7 +729,7 @@ logoutBtn.addEventListener('click', async () => {
 // ---- Duel ---------------------------------------------------------------
 const PLAN_AHEAD = 5; // rounds planned ahead (matches the server)
 let duelState = null;
-let duelReturnTab = 'lobby'; // tab to show after leaving a duel
+let duelReturnTab = 'chat'; // tab to show after leaving a duel
 let planSlots = [null, null, null, null, null];
 let pendingCard = null; // card chosen for the far slot, not yet accepted
 
@@ -755,14 +757,14 @@ function duelErrorText(error) {
 findDuelBtn.addEventListener('click', () => {
   ensureCatalog().catch(() => {});
   duelCtaNote.textContent = '';
-  duelReturnTab = 'lobby';
+  duelReturnTab = 'chat';
   socket.emit('duel:find');
 });
 
 practiceDuelBtn.addEventListener('click', () => {
   ensureCatalog().catch(() => {});
-  duelCtaNote.textContent = '';
-  duelReturnTab = 'lobby';
+  practiceNoteEl.textContent = '';
+  duelReturnTab = 'map';
   socket.emit('duel:practice');
 });
 
@@ -783,7 +785,7 @@ function backToLobby() {
   duelState = null;
   showOnly(appView);
   selectTab(duelReturnTab);
-  duelReturnTab = 'lobby';
+  duelReturnTab = 'chat';
 }
 
 function tickDuelTimer() {
@@ -839,7 +841,9 @@ socket.on('duel:end', ({ view }) => {
 socket.on('duel:error', ({ error }) => {
   duelSearchEl.hidden = true;
   findDuelBtn.hidden = false;
-  duelCtaNote.textContent = duelErrorText(error);
+  // practice is launched from the Map tab; matchmaking from Chat
+  if (duelReturnTab === 'map') practiceNoteEl.textContent = duelErrorText(error);
+  else duelCtaNote.textContent = duelErrorText(error);
 });
 
 function hpTrack(hp, max) {

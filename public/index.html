@@ -104,7 +104,7 @@
           <button class="tab is-active" data-tab="character">Character</button>
           <button class="tab" data-tab="deck">Deck</button>
           <button class="tab" data-tab="map">Map</button>
-          <button class="tab" data-tab="lobby">Lobby</button>
+          <button class="tab" data-tab="chat">Chat</button>
         </nav>
 
         <section id="tab-character" class="tab-panel">
@@ -154,6 +154,19 @@
         <section id="tab-map" class="tab-panel" hidden>
           <div class="sheet">
             <div class="sheet-head">
+              <h2>Training</h2>
+            </div>
+            <p class="hint">
+              A quick sparring match against a bot &mdash; no travel, no stakes.
+            </p>
+            <div class="duel-cta">
+              <button id="practice-duel" class="btn discord">Practice vs Bot</button>
+              <span id="practice-note" class="hint"></span>
+            </div>
+          </div>
+
+          <div class="sheet">
+            <div class="sheet-head">
               <h2>World map</h2>
               <span id="map-here" class="pill" hidden></span>
             </div>
@@ -164,10 +177,9 @@
           </div>
         </section>
 
-        <section id="tab-lobby" class="tab-panel" hidden>
+        <section id="tab-chat" class="tab-panel" hidden>
           <div class="duel-cta">
             <button id="find-duel" class="btn discord">Find Duel</button>
-            <button id="practice-duel" class="btn ghost">Practice vs Bot</button>
             <span id="duel-search" class="hint" hidden>
               Searching for an opponent&hellip;
               <button id="cancel-search" class="mini-btn">Cancel</button>
