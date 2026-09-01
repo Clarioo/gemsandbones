@@ -140,11 +140,28 @@ function setCharacterLevel(userId, level) {
   return character;
 }
 
+/**
+ * Set the character's current world-map location (a location id, or null when
+ * they are not in one). Persisted so a page reload keeps you where you were.
+ * Returns the character, or null.
+ */
+function setCharacterLocation(userId, locationId) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  character.locationId = locationId || null;
+  save(data);
+  return character;
+}
+
 module.exports = {
   upsertUser,
   getUserById,
   setCharacterClass,
   setCharacterName,
   setCharacterLevel,
+  setCharacterLocation,
   setDeck,
 };

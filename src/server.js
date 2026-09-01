@@ -15,6 +15,7 @@ const {
   getUserById,
   setCharacterClass,
   setCharacterLevel,
+  setCharacterLocation,
   setDeck,
 } = require('./db');
 const { CLASSES, isValidClassId, getClass } = require('./classes');
@@ -268,6 +269,7 @@ function toPublicCharacter(c) {
     classId: c.classId,
     className: cls ? cls.name : c.classId,
     level,
+    locationId: c.locationId || null,
     deckSize: Array.isArray(c.deck) ? c.deck.length : 0,
     // Base stats for now. Once items/equipment exist, pass their modifiers
     // into resolveStats() here as itemMods.
@@ -283,6 +285,7 @@ io.engine.use(sessionMiddleware);
 const duelHub = createDuelHub(io, { getUserById });
 const locationHub = createLocationHub(io, {
   getUserById,
+  setCharacterLocation,
   startBotDuel: duelHub.startBotDuel,
 });
 
