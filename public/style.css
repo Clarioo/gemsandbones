@@ -275,7 +275,7 @@ h1 {
 /* ---- Equipment ---- */
 .equip-slots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin-top: 14px;
 }
@@ -296,34 +296,31 @@ h1 {
   color: var(--faint);
   font-weight: 700;
 }
-.es-name { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; }
+.es-name { font-family: var(--font-display); font-weight: 700; font-size: 0.9rem; }
 .es-empty { color: var(--faint); font-size: 0.85rem; }
-.es-chips, .ic-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .equip-slot .mini-btn { align-self: flex-start; }
 
 .bag-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
 .item-card {
-  --c: var(--border);
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   padding: 11px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--c);
   border-radius: 8px;
 }
-.item-card[data-slot='weapon'] { --c: var(--t-physicalAttack); }
-.item-card[data-slot='helmet'] { --c: var(--t-bonus); }
-.item-card[data-slot='armor']  { --c: var(--t-defensive); }
-.item-card[data-slot='boots']  { --c: var(--el-electric); }
-.item-card[data-slot='ring']   { --c: var(--t-special); }
-.item-card.is-equipped { box-shadow: 0 0 0 1px var(--accent) inset; }
+.item-card.is-equipped {
+  border-color: var(--accent);
+  border-width: 2px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+}
 .ic-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .ic-name { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; }
 .ic-slot {
@@ -333,23 +330,58 @@ h1 {
   color: var(--faint);
   flex: none;
 }
+
+/* centre "art" placeholder (real art TODO) */
+.ic-art {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  height: 64px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--faint) 10%, var(--panel-3));
+  border: 1px solid var(--border);
+}
+.ic-art .ico { width: 30px; height: 30px; color: var(--faint); }
+
+.ic-worn {
+  align-self: flex-start;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--good);
+  border: 1px solid color-mix(in srgb, var(--good) 45%, var(--border));
+  border-radius: 999px;
+  padding: 2px 9px;
+}
 .ic-req { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.72rem; color: var(--muted); }
 .ic-req .unmet { color: var(--t-elementalAttack); font-weight: 700; }
-.ic-worn { color: var(--good); font-weight: 700; }
 .ic-actions { display: flex; gap: 6px; margin-top: 2px; }
 
-/* item stat chips: base stats neutral, random bonuses green */
-.es-chips .pchip,
-.ic-chips .pchip {
-  --c: var(--faint);
-  background: color-mix(in srgb, var(--faint) 14%, var(--panel-3));
+/* vertical stat lines: one per stat / bonus */
+.istats { display: flex; flex-direction: column; gap: 3px; }
+.istat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
   color: var(--muted);
+  min-width: 0;
 }
-.es-chips .pchip--bonus,
-.ic-chips .pchip--bonus,
-.pchip--bonus {
-  background: color-mix(in srgb, var(--good) 18%, var(--panel-2));
-  color: var(--good);
+.istat-l { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.istat-l .ico { flex: none; }
+.istat-v { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); flex: none; }
+.istat--bonus .istat-l { color: var(--good); }
+.istat--bonus .istat-v { color: var(--good); }
+
+/* element glyph inside a shield outline — elemental DEFENSE */
+.sh-ico { position: relative; display: inline-flex; flex: none; }
+.sh-ico .sh-inner {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translate(-50%, -50%);
 }
 
 .dura { display: flex; align-items: center; gap: 6px; }
