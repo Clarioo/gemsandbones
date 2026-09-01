@@ -483,14 +483,16 @@ function renderDeck() {
     }
   }
 
-  // Card pool: everything this class can use, sorted per the toggle
+  // Card pool: the whole catalog, sorted per the toggle. Cards your class
+  // cannot use are shown but locked (you can look, not add) and sort last.
   poolListEl.replaceChildren();
-  const pool = [...cardCatalog.values()].filter((c) => c.usable);
+  const pool = [...cardCatalog.values()];
+  const byUsable = (a, b) => Number(b.usable) - Number(a.usable);
   if (poolSort === 'type') {
     for (const t of cardTypes) {
       const cards = pool
         .filter((c) => c.type === t.id)
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => byUsable(a, b) || a.name.localeCompare(b.name));
       if (!cards.length) continue;
       const grid = document.createElement('div');
       grid.className = 'card-grid';
@@ -502,8 +504,8 @@ function renderDeck() {
   } else {
     const sorted = [...pool].sort(
       poolSort === 'mana'
-        ? (a, b) => a.manaCost - b.manaCost || a.name.localeCompare(b.name)
-        : (a, b) => a.name.localeCompare(b.name),
+        ? (a, b) => byUsable(a, b) || a.manaCost - b.manaCost || a.name.localeCompare(b.name)
+        : (a, b) => byUsable(a, b) || a.name.localeCompare(b.name),
     );
     const grid = document.createElement('div');
     grid.className = 'card-grid';
@@ -644,14 +646,16 @@ function gameCard(cardOrId, opts = {}) {
       plus.disabled = n >= deckLimits.maxCopies || atMax;
       ctr.append(plus);
     } else {
+      const locked = card && card.usable === false;
+      if (locked) el.classList.add('is-locked');
       if (n) {
         const c = document.createElement('span');
         c.className = 'count';
         c.textContent = `×${n}`;
         ctr.append(c);
       }
-      const add = miniButton('Add', () => setCardCount(id, n + 1));
-      add.disabled = n >= deckLimits.maxCopies || atMax;
+      const add = miniButton(locked ? 'Locked' : 'Add', () => setCardCount(id, n + 1));
+      add.disabled = locked || n >= deckLimits.maxCopies || atMax;
       ctr.append(add);
     }
     foot.append(left, ctr);
