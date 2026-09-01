@@ -88,7 +88,7 @@ test('seek outside a location errors; inside it starts a bot duel with a rolled 
   s.fire('location:enter', { locationId: 'whisperwood-fringe' });
   s.fire('location:seek');
   const { opts } = harness.lastDuel;
-  assert.ok(opts.level >= 1 && opts.level <= 5);
+  assert.ok(opts.level >= 3 && opts.level <= 6);
   assert.equal(typeof opts.botClassId, 'string');
   assert.match(opts.botName, /Lvl \d+/);
 });

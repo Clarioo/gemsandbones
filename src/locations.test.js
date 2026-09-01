@@ -22,23 +22,30 @@ test('every location has a valid, self-consistent shape', () => {
 });
 
 test('getLocation resolves known ids and rejects unknown ones', () => {
+  assert.equal(getLocation('millbrook-commons').id, 'millbrook-commons');
   assert.equal(getLocation('whisperwood-fringe').id, 'whisperwood-fringe');
   assert.equal(getLocation('nope'), null);
+});
+
+test('the starter location covers levels 1-2, Whisperwood 3-6', () => {
+  assert.deepEqual(getLocation('millbrook-commons').enemyLevels, { min: 1, max: 2 });
+  assert.deepEqual(getLocation('whisperwood-fringe').enemyLevels, { min: 3, max: 6 });
 });
 
 test('toPublicLocation drops the internal enemy pool', () => {
   const pub = toPublicLocation(getLocation('whisperwood-fringe'));
   assert.equal(pub.enemies, undefined);
-  assert.deepEqual(pub.enemyLevels, { min: 1, max: 5 });
+  assert.deepEqual(pub.enemyLevels, { min: 3, max: 6 });
 });
 
 test('rollEnemy stays within the level range and picks a real class', () => {
-  const loc = getLocation('whisperwood-fringe');
-  for (let i = 0; i < 200; i++) {
-    const e = rollEnemy(loc);
-    assert.ok(e.level >= loc.enemyLevels.min && e.level <= loc.enemyLevels.max);
-    assert.ok(isValidClassId(e.classId));
-    assert.match(e.name, /Lvl \d+/);
+  for (const loc of LOCATIONS) {
+    for (let i = 0; i < 200; i++) {
+      const e = rollEnemy(loc);
+      assert.ok(e.level >= loc.enemyLevels.min && e.level <= loc.enemyLevels.max);
+      assert.ok(isValidClassId(e.classId));
+      assert.match(e.name, /Lvl \d+/);
+    }
   }
 });
 
