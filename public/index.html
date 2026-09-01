@@ -85,10 +85,11 @@
         <a class="btn discord" href="/auth/discord">Login with Discord</a>
       </section>
 
-      <!-- Shown after login, before a class is chosen -->
+      <!-- Shown after login, before a class is chosen (and for a dev re-pick) -->
       <section id="setup-view" hidden>
-        <p>Welcome, <b id="setup-name"></b>. Choose your class:</p>
+        <p id="setup-intro"></p>
         <div id="class-grid" class="class-grid"></div>
+        <button id="setup-cancel" type="button" class="btn ghost" hidden>Keep current class</button>
       </section>
 
       <!-- Shown when logged in and set up -->
@@ -111,13 +112,17 @@
           <div class="sheet">
             <div class="sheet-head">
               <h2 id="sheet-title">Character</h2>
-              <label class="level-control">
-                Level
-                <input id="level-input" type="number" min="1" max="50" value="1" />
-              </label>
+              <div class="dev-tools" id="dev-tools" hidden>
+                <span class="dev-tag">Dev</span>
+                <button id="change-class" type="button" class="btn ghost">Change class</button>
+                <label class="level-control" id="level-control">
+                  Level
+                  <input id="level-input" type="number" min="1" max="50" value="1" />
+                </label>
+              </div>
             </div>
-            <p class="hint level-note">
-              Level can be set by hand for now so you can see the stats scale &mdash;
+            <p class="hint level-note" id="level-note" hidden>
+              Dev tool: set your level by hand to preview how stats scale.
               XP-based leveling comes later.
             </p>
             <div id="stat-groups" class="stat-groups"></div>

@@ -31,6 +31,7 @@ const {
 const { createDuelHub } = require('./duelHub');
 const { createLocationHub } = require('./locationHub');
 const { LOCATIONS, toPublicLocation } = require('./locations');
+const { isDevUser } = require('./devs');
 
 const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
 
@@ -162,11 +163,18 @@ app.get('/api/classes', (req, res) => {
   res.json({ classes: CLASSES });
 });
 
-/** Choose (or, for now, change) the player's class. */
+/**
+ * Pick the player's class. Everyone gets one first pick (character setup);
+ * changing it afterwards is a dev-only tool.
+ */
 app.post('/api/character/class', requireAuth, (req, res) => {
   const { classId } = req.body || {};
   if (!isValidClassId(classId)) {
     return res.status(400).json({ error: 'invalid_class' });
+  }
+  const alreadyPicked = req.user.character && req.user.character.classId;
+  if (alreadyPicked && !isDevUser(req.user)) {
+    return res.status(403).json({ error: 'class_locked' });
   }
   const character = setCharacterClass(req.user.id, classId);
   res.json({ character: toPublicCharacter(character) });
@@ -183,10 +191,11 @@ app.get('/api/stats/definitions', (req, res) => {
 });
 
 /**
- * TEMPORARY: set the character's level directly so we can see stat scaling.
- * Replace with XP-based leveling once that exists.
+ * Set the character's level directly. Dev-only tool for previewing stat
+ * scaling until XP-based leveling exists.
  */
 app.post('/api/character/level', requireAuth, (req, res) => {
+  if (!isDevUser(req.user)) return res.status(403).json({ error: 'not_dev' });
   const level = Math.floor(Number(req.body && req.body.level));
   if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL) {
     return res.status(400).json({ error: 'invalid_level', min: 1, max: MAX_LEVEL });
@@ -255,6 +264,7 @@ function toPublicUser(u) {
     username: u.username,
     displayName: u.globalName || u.username,
     avatarUrl,
+    isDev: isDevUser(u),
     character: toPublicCharacter(u.character),
   };
 }

@@ -6,7 +6,8 @@ const socket = io({ autoConnect: false });
 const loginView = document.getElementById('login-view');
 const setupView = document.getElementById('setup-view');
 const appView = document.getElementById('app-view');
-const setupName = document.getElementById('setup-name');
+const setupIntroEl = document.getElementById('setup-intro');
+const setupCancelBtn = document.getElementById('setup-cancel');
 const classGrid = document.getElementById('class-grid');
 const profileEl = document.getElementById('profile');
 const sheetTitle = document.getElementById('sheet-title');
@@ -17,6 +18,9 @@ const form = document.getElementById('chat-form');
 const input = document.getElementById('chat-input');
 const playerCountEl = document.getElementById('player-count');
 const logoutBtn = document.getElementById('logout-btn');
+const devToolsEl = document.getElementById('dev-tools');
+const levelNoteEl = document.getElementById('level-note');
+const changeClassBtn = document.getElementById('change-class');
 
 const tabsNav = document.querySelector('.tabs');
 const tabPanels = {
@@ -91,7 +95,11 @@ function showLogin() {
 
 async function showSetup(user) {
   showOnly(setupView);
-  setupName.textContent = user.displayName;
+  const repick = !!(user.character && user.character.classId);
+  setupIntroEl.textContent = repick
+    ? 'Pick a new class. Your deck resets to that class’s starter if it no longer fits.'
+    : `Welcome, ${user.displayName}. Choose your class:`;
+  setupCancelBtn.hidden = !repick;
 
   const res = await fetch('/api/classes');
   const { classes } = await res.json();
@@ -101,6 +109,7 @@ async function showSetup(user) {
     const card = document.createElement('button');
     card.className = 'class-card';
     card.type = 'button';
+    if (repick && cls.id === user.character.classId) card.classList.add('is-current');
 
     const title = document.createElement('h3');
     title.textContent = cls.name;
@@ -113,6 +122,8 @@ async function showSetup(user) {
   }
 }
 
+setupCancelBtn.addEventListener('click', () => showApp(currentUser));
+
 async function chooseClass(classId) {
   for (const b of classGrid.querySelectorAll('button')) b.disabled = true;
 
@@ -122,14 +133,21 @@ async function chooseClass(classId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ classId }),
     });
-    if (!res.ok) throw new Error('request failed');
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || 'request failed');
+    }
     const { character } = await res.json();
     currentUser.character = character;
     showApp(currentUser);
   } catch (err) {
     console.error(err);
     for (const b of classGrid.querySelectorAll('button')) b.disabled = false;
-    alert('Could not select that class. Please try again.');
+    alert(
+      err.message === 'class_locked'
+        ? 'Changing class is a dev-only tool.'
+        : 'Could not select that class. Please try again.',
+    );
   }
 }
 
@@ -149,6 +167,10 @@ async function showApp(user) {
 
   if (!socket.connected) socket.connect();
 
+  // Dev-only tools: change class / set level by hand.
+  devToolsEl.hidden = !user.isDev;
+  levelNoteEl.hidden = !user.isDev;
+
   if (user.character) {
     currentLocationId = user.character.locationId || null;
     if (!statDefs) statDefs = await fetch('/api/stats/definitions').then((r) => r.json());
@@ -157,6 +179,8 @@ async function showApp(user) {
     loadDeck().catch((err) => console.error(err));
   }
 }
+
+changeClassBtn.addEventListener('click', () => showSetup(currentUser));
 
 // ---- Tabs -----------------------------------------------------------------
 tabsNav.addEventListener('click', (e) => {
