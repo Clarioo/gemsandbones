@@ -1348,7 +1348,10 @@ function statGroup(title, build) {
   return g;
 }
 
-function renderPlayerPanel(el, p, isYou) {
+const hasElementalAttack = (st) =>
+  ((st && st.fireAtkMax) || 0) + ((st && st.waterAtkMax) || 0) + ((st && st.electricAtkMax) || 0) > 0;
+
+function renderPlayerPanel(el, p, isYou, showElementalDef) {
   el.replaceChildren();
   const st = p.stats || p.baseStats || {};
   const base = p.baseStats || {};
@@ -1389,14 +1392,24 @@ function renderPlayerPanel(el, p, isYou) {
     }),
   );
 
-  const hasElemental =
-    (st.fireAtkMax || 0) + (st.waterAtkMax || 0) + (st.electricAtkMax || 0) > 0;
-  if (hasElemental) {
+  if (hasElementalAttack(st)) {
     el.append(
       statGroup('Elemental attack', (dl) => {
         statRow(dl, { label: 'Fire', iconName: 'fire', elClass: 'fire', value: `${st.fireAtkMin}–${st.fireAtkMax}` });
         statRow(dl, { label: 'Water', iconName: 'water', elClass: 'water', value: `${st.waterAtkMin}–${st.waterAtkMax}` });
         statRow(dl, { label: 'Electric', iconName: 'electric', elClass: 'elec', value: `${st.electricAtkMin}–${st.electricAtkMax}` });
+      }),
+    );
+  }
+
+  // Elemental defense is shown for both sides whenever elemental damage could
+  // land this duel (either fighter has an elemental attack).
+  if (showElementalDef) {
+    el.append(
+      statGroup('Elemental defense', (dl) => {
+        statRow(dl, { label: 'Fire', iconName: 'fire', elClass: 'fire', value: st.fireDef, base: base.fireDef });
+        statRow(dl, { label: 'Water', iconName: 'water', elClass: 'water', value: st.waterDef, base: base.waterDef });
+        statRow(dl, { label: 'Electric', iconName: 'electric', elClass: 'elec', value: st.electricDef, base: base.electricDef });
       }),
     );
   }
@@ -1529,8 +1542,11 @@ function renderDuel() {
     v.phase === 'ended' ? 'Duel over' : `Round ${v.round} / ${v.totalRounds}`;
   tickDuelTimer();
 
-  renderPlayerPanel(duelOppoEl, v.opponent, false);
-  renderPlayerPanel(duelYouEl, v.you, true);
+  const elementalInPlay =
+    hasElementalAttack(v.you.stats) ||
+    hasElementalAttack(v.opponent.stats || v.opponent.baseStats);
+  renderPlayerPanel(duelOppoEl, v.opponent, false, elementalInPlay);
+  renderPlayerPanel(duelYouEl, v.you, true, elementalInPlay);
 
   duelLogEl.replaceChildren();
   for (const r of v.log) {
