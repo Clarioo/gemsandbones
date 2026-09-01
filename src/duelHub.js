@@ -30,7 +30,7 @@ const duelEngine = require('./duel');
 const duelBot = require('./duelBot');
 const { isDuelLegal, defaultDeckForClass } = require('./deck');
 const { CLASSES } = require('./classes');
-const { equippedItemMods } = require('./items');
+const { equippedItemMods, rollEnemyLoadout } = require('./items');
 
 function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
   const queue = []; // userIds waiting
@@ -223,6 +223,7 @@ function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
       classId: botClassId,
       level: botLevel,
       deck: defaultDeckForClass(botClassId),
+      itemMods: rollEnemyLoadout(botClassId, botLevel), // AI enemies wear a full level-scaled kit
     };
 
     const id = crypto.randomUUID();

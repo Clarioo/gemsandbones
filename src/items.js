@@ -162,6 +162,27 @@ function rollRandomItem(rng = Math.random) {
   return rollItem(ITEM_TEMPLATES[Math.floor(rng() * ITEM_TEMPLATES.length)], rng);
 }
 
+/**
+ * A full, level-appropriate equipped set for an AI enemy: one random item per
+ * slot the class can use and the level allows. Returns the itemMods array for
+ * resolveStats() -- bots are throwaway, so no bag / durability / uid tracking.
+ */
+function rollEnemyLoadout(classId, level, rng = Math.random) {
+  const mods = [];
+  for (const slot of SLOTS) {
+    const options = ITEM_TEMPLATES.filter(
+      (t) =>
+        t.slot === slot &&
+        itemUsableByClass(t, classId) &&
+        ((t.requirements && t.requirements.level) || 1) <= (level || 1),
+    );
+    if (!options.length) continue;
+    const template = options[Math.floor(rng() * options.length)];
+    mods.push(itemStatTotals(rollItem(template, rng)));
+  }
+  return mods;
+}
+
 function itemUsableByClass(item, classId) {
   if (!item) return false;
   return item.classes === 'all' || (Array.isArray(item.classes) && item.classes.includes(classId));
@@ -220,6 +241,7 @@ module.exports = {
   getTemplate,
   rollItem,
   rollRandomItem,
+  rollEnemyLoadout,
   rollBonuses,
   itemUsableByClass,
   canEquip,

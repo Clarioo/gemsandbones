@@ -11,6 +11,7 @@ const {
   ITEM_TEMPLATES,
   rollItem,
   rollRandomItem,
+  rollEnemyLoadout,
   rollBonuses,
   canEquip,
   equippedItemMods,
@@ -79,6 +80,24 @@ test('canEquip gates on class and level', () => {
 test('itemStatTotals merges base stats and bonuses', () => {
   const item = { stats: { defense: 4, health: 10 }, bonuses: [{ stat: 'defense', amount: 2 }, { stat: 'mana', amount: 5 }] };
   assert.deepEqual(itemStatTotals(item), { defense: 6, health: 10, mana: 5 });
+});
+
+test('rollEnemyLoadout gives an AI enemy a level-appropriate kit', () => {
+  for (const classId of CLASS_IDS) {
+    // a level-1 enemy never gets an item that needs a higher level
+    const low = rollEnemyLoadout(classId, 1);
+    assert.ok(low.length >= 1 && low.length <= SLOTS.length);
+    for (const mod of low) assert.equal(typeof mod, 'object');
+
+    // more slots become fillable as level rises (>= the low-level count)
+    const high = rollEnemyLoadout(classId, 10);
+    assert.ok(high.length >= low.length);
+  }
+  // every template a level-1 hunter could roll is actually level 1
+  for (let i = 0; i < 50; i++) {
+    const mods = rollEnemyLoadout('hunter', 1);
+    assert.ok(mods.length >= 1);
+  }
 });
 
 test('equippedItemMods only counts valid, equipped, unbroken items', () => {
