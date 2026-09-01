@@ -845,6 +845,36 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
 .plan-slot[data-type='elementalAttack'] { --c: var(--t-elementalAttack); }
 .plan-slot[data-type='physicalAttack']  { --c: var(--t-physicalAttack); }
 
+/* ---- World map ---- */
+.location-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.location-card {
+  padding: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.location-card.is-here {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.location-card h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.location-card p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; }
+.location-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.location-note:empty { display: none; }
+.location-note { margin: 10px 0 0; }
+
 .chat-form { display: flex; gap: 8px; }
 .chat-form input {
   flex: 1;

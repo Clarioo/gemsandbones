@@ -103,6 +103,7 @@
         <nav class="tabs">
           <button class="tab is-active" data-tab="character">Character</button>
           <button class="tab" data-tab="deck">Deck</button>
+          <button class="tab" data-tab="map">Map</button>
           <button class="tab" data-tab="lobby">Lobby</button>
         </nav>
 
@@ -147,6 +148,19 @@
               </div>
               <div id="pool-list" class="card-groups"></div>
             </div>
+          </div>
+        </section>
+
+        <section id="tab-map" class="tab-panel" hidden>
+          <div class="sheet">
+            <div class="sheet-head">
+              <h2>World map</h2>
+              <span id="map-here" class="pill" hidden></span>
+            </div>
+            <p class="hint">
+              Travel to a location to find enemies. You can leave any time.
+            </p>
+            <div id="location-list" class="location-list"></div>
           </div>
         </section>
 

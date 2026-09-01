@@ -184,6 +184,53 @@ function createDuelHub(io, { getUserById }) {
     cleanupDuel(duel);
   }
 
+  /**
+   * Start a duel against a bot. Used by "Practice vs Bot" (no opts -> a random
+   * class at the player's own level) and by the world map (opts pin the enemy's
+   * class, level and name from the location). Returns { ok } / { ok:false, error }.
+   */
+  function startBotDuel(userId, opts = {}) {
+    if (duelOf(userId)) return { ok: false, error: 'already_in_duel' };
+    const c = currentCharacter(userId);
+    if (!c) return { ok: false, error: 'no_class' };
+    if (!isDuelLegal(c.character.deck, c.character.classId)) {
+      return { ok: false, error: 'deck_not_duel_legal' };
+    }
+    leaveQueue(userId);
+
+    const fallbackClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
+    const botClassId = opts.botClassId || fallbackClass.id;
+    const botLevel = opts.level || c.character.level || 1;
+    const botName =
+      opts.botName ||
+      `Training Bot (${(CLASSES.find((k) => k.id === botClassId) || fallbackClass).name})`;
+
+    const human = {
+      userId,
+      name: c.character.name,
+      classId: c.character.classId,
+      level: c.character.level || 1,
+      deck: [...c.character.deck],
+    };
+    const bot = {
+      userId: `bot:${crypto.randomUUID()}`,
+      name: botName,
+      classId: botClassId,
+      level: botLevel,
+      deck: defaultDeckForClass(botClassId),
+    };
+
+    const id = crypto.randomUUID();
+    const duel = duelEngine.createDuel(id, human, bot);
+    duels.set(id, duel);
+    userDuel.set(userId, id);
+    botDuels.set(id, bot.userId);
+    armDuelTimer(duel);
+    sendViews(duel, 'start');
+    if (botAct(duel)) sendViews(duel, 'update');
+    return { ok: true };
+  }
+
   // -- per-connection wiring ------------------------------------------------
   function onConnection(socket, user) {
     const userId = user.id;
@@ -202,39 +249,8 @@ function createDuelHub(io, { getUserById }) {
     });
 
     socket.on('duel:practice', () => {
-      if (duelOf(userId)) return socket.emit('duel:error', { error: 'already_in_duel' });
-      const c = currentCharacter(userId);
-      if (!c) return socket.emit('duel:error', { error: 'no_class' });
-      if (!isDuelLegal(c.character.deck, c.character.classId)) {
-        return socket.emit('duel:error', { error: 'deck_not_duel_legal' });
-      }
-      leaveQueue(userId);
-
-      const botClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
-      const level = c.character.level || 1;
-      const human = {
-        userId,
-        name: c.character.name,
-        classId: c.character.classId,
-        level,
-        deck: [...c.character.deck],
-      };
-      const bot = {
-        userId: `bot:${crypto.randomUUID()}`,
-        name: `Training Bot (${botClass.name})`,
-        classId: botClass.id,
-        level,
-        deck: defaultDeckForClass(botClass.id),
-      };
-
-      const id = crypto.randomUUID();
-      const duel = duelEngine.createDuel(id, human, bot);
-      duels.set(id, duel);
-      userDuel.set(userId, id);
-      botDuels.set(id, bot.userId);
-      armDuelTimer(duel);
-      sendViews(duel, 'start');
-      if (botAct(duel)) sendViews(duel, 'update');
+      const r = startBotDuel(userId);
+      if (!r.ok) socket.emit('duel:error', { error: r.error });
     });
 
     socket.on('duel:cancel', () => {
@@ -274,7 +290,7 @@ function createDuelHub(io, { getUserById }) {
     if (sockets.get(userId)) sockets.delete(userId);
   }
 
-  return { onConnection, onDisconnect };
+  return { onConnection, onDisconnect, startBotDuel };
 }
 
 module.exports = { createDuelHub };
