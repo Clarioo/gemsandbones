@@ -375,7 +375,7 @@ function previewParts(card, stats) {
     } else if (b.kind === 'modifyStat') {
       const sign = b.amount >= 0 ? '+' : '';
       const name = statLabel(b.stat);
-      const short = name.replace(/^Attack /, '').replace(/ Attack$/, '');
+      const short = name.replace(/\bAttack\b ?/g, '').trim() || name;
       const who = b.target === 'opponent' ? "the opponent's" : 'your';
       const when = whenLabel(b.duration);
       parts.push({

@@ -204,8 +204,13 @@ const CARDS = [
     manaCost: 4,
     classes: 'all',
     graphic: '/cards/focus.png',
-    description: 'Sharpen your aim — raises your max attack next round.',
-    behaviour: [{ kind: 'modifyStat', stat: 'attackMax', amount: 6, target: 'self', duration: 'nextRound' }],
+    description: 'Sharpen your aim — raises your max attack, physical and elemental, next round.',
+    behaviour: [
+      { kind: 'modifyStat', stat: 'attackMax', amount: 6, target: 'self', duration: 'nextRound' },
+      { kind: 'modifyStat', stat: 'fireAtkMax', amount: 6, target: 'self', duration: 'nextRound' },
+      { kind: 'modifyStat', stat: 'waterAtkMax', amount: 6, target: 'self', duration: 'nextRound' },
+      { kind: 'modifyStat', stat: 'electricAtkMax', amount: 6, target: 'self', duration: 'nextRound' },
+    ],
   },
   {
     id: 'adrenaline',
