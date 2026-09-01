@@ -23,12 +23,29 @@ const { isValidClassId } = require('./classes');
 
 const LOCATIONS = [
   {
+    id: 'millbrook-commons',
+    name: 'Millbrook Commons',
+    blurb:
+      'The pasture and market road just outside the town walls. The roughest ' +
+      'thing you will meet here is a cutpurse or a spooked farmhand — the place ' +
+      'to find your feet.',
+    enemyLevels: { min: 1, max: 2 },
+    requirements: [],
+    enemies: [
+      { name: 'Cutpurse', classId: 'fencer' },
+      { name: 'Tavern Brawler', classId: 'protector' },
+      { name: 'Hedge Apprentice', classId: 'mage' },
+      { name: 'Stray Hound', classId: 'hunter' },
+      { name: 'Drunk Mercenary', classId: 'fencer' },
+    ],
+  },
+  {
     id: 'whisperwood-fringe',
     name: 'Whisperwood Fringe',
     blurb:
-      'A thin belt of forest at the edge of the valley. Only stragglers and ' +
-      'small-time raiders wander this far out — a safe place to test a deck.',
-    enemyLevels: { min: 1, max: 5 },
+      'A thin belt of forest at the edge of the valley. Bandits, wolves and ' +
+      'worse push in from the deep wood — a real step up from the town commons.',
+    enemyLevels: { min: 3, max: 6 },
     requirements: [],
     enemies: [
       { name: 'Bandit Scout', classId: 'fencer' },
