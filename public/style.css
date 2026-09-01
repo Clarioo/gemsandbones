@@ -432,6 +432,10 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
 .gcard:disabled { opacity: 0.4; cursor: default; }
 .gcard.is-selected { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 
+/* Pool card your class cannot use: visible for reference, not addable. */
+.gcard.is-locked { opacity: 0.5; }
+.gcard.is-locked .gcard__meta { color: var(--t-elementalAttack); }
+
 .gcard[data-type='specialBlock']    { --c: var(--t-specialBlock); }
 .gcard[data-type='special']         { --c: var(--t-special); }
 .gcard[data-type='bonus']           { --c: var(--t-bonus); }
