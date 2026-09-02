@@ -447,13 +447,17 @@ h1 {
   transform: translate(-50%, -50%);
 }
 
-.dura { display: flex; align-items: center; gap: 6px; }
+.dura { display: flex; align-items: center; gap: 6px; cursor: help; }
+.dura .ico { width: 11px; height: 11px; color: var(--faint); flex: none; }
+.dura.low .ico { color: var(--t-elementalAttack); }
+.dura.broken .ico { color: var(--hp); }
 .dura-label {
   font-size: 0.62rem;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
-  min-width: 52px;
+  min-width: 44px;
 }
+.dura.broken .dura-label { color: var(--hp); }
 .dura-track {
   flex: 1;
   height: 4px;
