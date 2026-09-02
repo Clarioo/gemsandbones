@@ -1005,15 +1005,21 @@ function itemArt(slot) {
 function durabilityBar(item) {
   const d = item.durability || { current: 0, max: 100 };
   const pct = d.max ? Math.max(0, Math.min(100, (d.current / d.max) * 100)) : 0;
+  const broken = d.current <= 0;
+  const low = !broken && pct < 25;
   const wrap = document.createElement('div');
-  wrap.className = 'dura';
+  wrap.className = 'dura' + (broken ? ' broken' : low ? ' low' : '');
+  wrap.title = broken
+    ? 'Durability: broken — this item grants no stats.'
+    : `Durability ${d.current}/${d.max}. Drops 1 per duel; at 0 the item breaks and its stats stop applying.`;
+  wrap.append(icon('durability', 11));
   const label = document.createElement('span');
   label.className = 'dura-label';
-  label.textContent = d.current <= 0 ? 'Broken' : `${d.current}/${d.max}`;
+  label.textContent = broken ? 'Broken' : `${d.current}/${d.max}`;
   const track = document.createElement('div');
   track.className = 'dura-track';
   const fill = document.createElement('div');
-  fill.className = 'dura-fill' + (d.current <= 0 ? ' broken' : pct < 25 ? ' low' : '');
+  fill.className = 'dura-fill' + (broken ? ' broken' : low ? ' low' : '');
   fill.style.width = `${pct}%`;
   track.append(fill);
   wrap.append(label, track);
