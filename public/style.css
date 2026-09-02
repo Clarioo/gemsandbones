@@ -334,6 +334,40 @@ h1 {
   gap: 10px;
   margin-top: 12px;
 }
+
+/* Bag filter bar — slot buttons + a "usable only" toggle. */
+.bag-filter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 12px 0 2px;
+}
+.bag-filter .filter-ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.bag-filter .filter-ctl > span { margin-right: 2px; }
+.bag-filter button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.bag-filter button:hover { color: var(--text); border-color: var(--accent); }
+.bag-filter button.is-active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
 .item-card {
   display: flex;
   flex-direction: column;

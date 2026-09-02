@@ -142,6 +142,18 @@
                 <span class="dev-tag">Dev</span> Generate item
               </button>
             </div>
+            <div id="bag-filter" class="bag-filter" hidden>
+              <div class="filter-ctl">
+                <span>Slot</span>
+                <button type="button" data-slot="all" class="is-active">All</button>
+                <button type="button" data-slot="weapon">Weapon</button>
+                <button type="button" data-slot="helmet">Helmet</button>
+                <button type="button" data-slot="armor">Armor</button>
+                <button type="button" data-slot="boots">Boots</button>
+                <button type="button" data-slot="ring">Ring</button>
+              </div>
+              <button type="button" id="bag-usable" class="filter-toggle">Usable only</button>
+            </div>
             <p id="bag-hint" class="hint" hidden></p>
             <div id="bag-list" class="bag-list"></div>
           </div>
