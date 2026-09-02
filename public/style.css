@@ -310,20 +310,29 @@ h1 {
 .stat-group dd.geared { color: var(--good); }
 .stat-group dd.nerfed { color: var(--hp); }
 
-/* Character tab: a slim stats column on the left, equipment + bag taking the
-   centre-right. Stacks on narrow screens. */
+/* App body: a permanent stats panel on the left, the tabbed content on the
+   right. Switching tabs only changes the right side; the stats stay put.
+   Stacks (stats first, then content) on narrow screens. */
+.app-layout { margin-top: 16px; }
+.stat-sidebar > .sheet { margin: 0; }
+
 @media (min-width: 900px) {
-  #tab-character {
+  .app-layout {
     display: grid;
-    grid-template-columns: minmax(230px, 285px) minmax(0, 1fr);
-    gap: 16px;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    gap: 20px;
     align-items: start;
   }
-  #tab-character > .sheet { margin: 0; }
-  #tab-character > .sheet:first-child  { grid-column: 1; grid-row: 1 / span 2; }
-  #tab-character > .sheet:nth-child(2) { grid-column: 2; grid-row: 1; }
-  #tab-character > .sheet:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .stat-sidebar {
+    position: sticky;
+    top: 44px; /* clears the sticky tab bar */
+    align-self: start;
+  }
+  .app-main { min-width: 0; }
 }
+
+/* top of each tab's content lines up with the top of the stats panel */
+.app-main > .tab-panel > :first-child { margin-top: 0; }
 
 /* ---- Equipment ---- */
 .equip-slots {
@@ -496,10 +505,9 @@ h1 {
 
 /* ---- Deck ---- */
 
-/* Deck + pool side by side. On wide screens the deck editor breaks out of the
-   720px page column (full-bleed) and fills the viewport: each pane's header
-   (title, count, distribution, sort) stays fixed and only the card list
-   scrolls. Below 980px the two panes stack and the whole page scrolls. */
+/* Deck + pool side by side, filling the content column. On wide screens each
+   pane's header (title, count, distribution, sort) stays fixed and only the
+   card list scrolls. Below 980px the two panes stack and the page scrolls. */
 .deck-layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -510,11 +518,6 @@ h1 {
 
 @media (min-width: 980px) {
   .deck-layout {
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 94vw;
-    max-width: 1280px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-auto-rows: 100%;
     align-items: stretch;

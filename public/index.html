@@ -112,7 +112,9 @@
           <button class="tab" data-tab="chat">Chat</button>
         </nav>
 
-        <section id="tab-character" class="tab-panel">
+        <!-- The stats panel is permanent; the tabs to its right swap the rest. -->
+        <div class="app-layout">
+        <aside class="stat-sidebar">
           <div class="sheet">
             <div class="sheet-head">
               <h2 id="sheet-title">Character</h2>
@@ -132,7 +134,10 @@
             </p>
             <div id="stat-groups" class="stat-groups"></div>
           </div>
+        </aside>
 
+        <div class="app-main">
+        <section id="tab-character" class="tab-panel">
           <div class="sheet">
             <div class="sheet-head">
               <h2>Equipment</h2>
@@ -236,6 +241,8 @@
             <button type="submit" class="btn">Send</button>
           </form>
         </section>
+        </div><!-- .app-main -->
+        </div><!-- .app-layout -->
       </section>
 
       <!-- Shown while in a duel -->
