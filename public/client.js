@@ -25,7 +25,12 @@ const equipSlotsEl = document.getElementById('equip-slots');
 const bagCountEl = document.getElementById('bag-count');
 const bagHintEl = document.getElementById('bag-hint');
 const bagListEl = document.getElementById('bag-list');
+const bagFilterEl = document.getElementById('bag-filter');
+const bagUsableBtn = document.getElementById('bag-usable');
 const generateItemBtn = document.getElementById('generate-item');
+
+let bagSlotFilter = 'all';
+let bagUsableOnly = false;
 
 const tabsNav = document.querySelector('.tabs');
 const tabPanels = {
@@ -717,6 +722,22 @@ deckResetBtn.addEventListener('click', async () => {
   }
 });
 
+bagFilterEl.addEventListener('click', (e) => {
+  const slotBtn = e.target.closest('button[data-slot]');
+  if (slotBtn) {
+    bagSlotFilter = slotBtn.dataset.slot;
+    for (const b of bagFilterEl.querySelectorAll('button[data-slot]')) {
+      b.classList.toggle('is-active', b === slotBtn);
+    }
+  } else if (e.target.closest('#bag-usable')) {
+    bagUsableOnly = !bagUsableOnly;
+    bagUsableBtn.classList.toggle('is-active', bagUsableOnly);
+  } else {
+    return;
+  }
+  if (currentUser && currentUser.character) renderEquipment(currentUser.character);
+});
+
 poolSortEl.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-sort]');
   if (!btn) return;
@@ -1037,6 +1058,7 @@ function renderEquipment(character) {
   bagCountEl.classList.toggle('warn', bag.length >= bagMax);
 
   bagListEl.replaceChildren();
+  bagFilterEl.hidden = !bag.length;
   if (!bag.length) {
     const p = document.createElement('p');
     p.className = 'empty-note';
@@ -1047,7 +1069,19 @@ function renderEquipment(character) {
     return;
   }
   const equipped = new Set(Object.values(equipment).filter(Boolean));
-  for (const item of bag) bagListEl.append(bagCard(character, item, equipped));
+  const shown = bag.filter((item) => {
+    if (bagSlotFilter !== 'all' && item.slot !== bagSlotFilter) return false;
+    if (bagUsableOnly && !clientCanEquip(character, item).ok) return false;
+    return true;
+  });
+  if (!shown.length) {
+    const p = document.createElement('p');
+    p.className = 'empty-note';
+    p.textContent = 'No items match the current filter.';
+    bagListEl.append(p);
+    return;
+  }
+  for (const item of shown) bagListEl.append(bagCard(character, item, equipped));
 }
 
 function bagCard(character, item, equippedUids) {
