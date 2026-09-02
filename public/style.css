@@ -230,40 +230,43 @@ h1 {
 }
 #setup-cancel { margin-top: 16px; }
 
+/* Compact vertical stat list, mirroring the duel player sheet (.dp-group):
+   no cards, just tiny uppercase headers over hairline-separated rows. */
 .stat-groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
 }
 .stat-group {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
+.stat-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 .stat-group h3 {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
+  margin: 0 0 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  letter-spacing: 0.07em;
+  color: var(--faint);
 }
 .stat-group dl {
   margin: 0;
   display: grid;
   grid-template-columns: 1fr auto;
-  row-gap: 4px;
+  row-gap: 3px;
   column-gap: 8px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 .stat-group dt {
   color: var(--muted);
-  font-size: 0.9rem;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 }
-.stat-group dt .ico { width: 14px; height: 14px; }
+.stat-group dt .ico { width: 12px; height: 12px; }
 .stat-group dt[data-stat='strength']     { color: var(--el-physical); }
 .stat-group dt[data-stat='vitality']     { color: var(--good); }
 .stat-group dt[data-stat='intelligence'] { color: var(--el-water); }
@@ -281,6 +284,21 @@ h1 {
 .stat-group dd[data-el='electric'] { color: var(--el-electric); }
 .stat-group dd.geared { color: var(--good); }
 .stat-group dd.nerfed { color: var(--hp); }
+
+/* Character tab: a slim stats column on the left, equipment + bag taking the
+   centre-right. Stacks on narrow screens. */
+@media (min-width: 900px) {
+  #tab-character {
+    display: grid;
+    grid-template-columns: minmax(230px, 285px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  #tab-character > .sheet { margin: 0; }
+  #tab-character > .sheet:first-child  { grid-column: 1; grid-row: 1 / span 2; }
+  #tab-character > .sheet:nth-child(2) { grid-column: 2; grid-row: 1; }
+  #tab-character > .sheet:nth-child(3) { grid-column: 2; grid-row: 2; }
+}
 
 /* ---- Equipment ---- */
 .equip-slots {
