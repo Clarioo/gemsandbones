@@ -326,7 +326,7 @@ h1 {
 }
 .es-name { font-family: var(--font-display); font-weight: 700; font-size: 0.9rem; }
 .es-empty { color: var(--faint); font-size: 0.85rem; }
-.equip-slot .mini-btn { align-self: flex-start; }
+.equip-slot .mini-btn { align-self: flex-start; margin-top: auto; }
 
 .bag-list {
   display: grid;
@@ -418,7 +418,8 @@ h1 {
 }
 .ic-req { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.72rem; color: var(--muted); }
 .ic-req .unmet { color: var(--t-elementalAttack); font-weight: 700; }
-.ic-actions { display: flex; gap: 6px; margin-top: 2px; }
+/* actions sit on the card's bottom edge regardless of how much sits above */
+.ic-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
 
 /* vertical stat lines: one per stat / bonus */
 .istats { display: flex; flex-direction: column; gap: 3px; }
