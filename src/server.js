@@ -15,6 +15,7 @@ const {
   getUserById,
   setCharacterClass,
   setCharacterLevel,
+  addCharacterXp,
   setCharacterLocation,
   setDeck,
   addItemToBag,
@@ -35,6 +36,7 @@ const {
 } = require('./deck');
 const { createDuelHub } = require('./duelHub');
 const { createLocationHub } = require('./locationHub');
+const { MAX_LEVEL, xpForNextLevel } = require('./leveling');
 const { LOCATIONS, toPublicLocation } = require('./locations');
 const { isDevUser } = require('./devs');
 const {
@@ -46,8 +48,6 @@ const {
 } = require('./items');
 
 const DECK_LIMITS = { min: DECK_MIN, max: DECK_MAX, maxCopies: MAX_COPIES };
-
-const MAX_LEVEL = 50;
 
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
@@ -340,6 +340,9 @@ function toPublicCharacter(c) {
     classId: c.classId,
     className: cls ? cls.name : c.classId,
     level,
+    xp: level >= MAX_LEVEL ? 0 : c.xp || 0,
+    xpForNext: xpForNextLevel(level),
+    maxLevel: MAX_LEVEL,
     locationId: c.locationId || null,
     deckSize: Array.isArray(c.deck) ? c.deck.length : 0,
     stats: resolveStats({ classId: c.classId, level, itemMods: equippedItemMods(c) }),
@@ -358,7 +361,7 @@ function toPublicCharacter(c) {
 // ---------------------------------------------------------------------------
 io.engine.use(sessionMiddleware);
 
-const duelHub = createDuelHub(io, { getUserById, wearEquipped });
+const duelHub = createDuelHub(io, { getUserById, wearEquipped, addCharacterXp });
 const locationHub = createLocationHub(io, {
   getUserById,
   setCharacterLocation,

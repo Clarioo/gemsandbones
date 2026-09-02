@@ -12,6 +12,7 @@ const classGrid = document.getElementById('class-grid');
 const profileEl = document.getElementById('profile');
 const sheetTitle = document.getElementById('sheet-title');
 const levelInput = document.getElementById('level-input');
+const xpBarEl = document.getElementById('xp-bar');
 const statGroupsEl = document.getElementById('stat-groups');
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('chat-form');
@@ -844,6 +845,7 @@ function elementOfStat(id) {
 
 function renderSheet(character) {
   sheetTitle.textContent = `${character.name} — ${character.className} · Lvl ${character.level}`;
+  renderXpBar(character);
 
   statGroupsEl.replaceChildren();
   for (const group of statDefs.groups) {
@@ -880,6 +882,36 @@ function renderSheet(character) {
     box.appendChild(dl);
     statGroupsEl.appendChild(box);
   }
+}
+
+/** Level + XP progress bar under the sheet title. */
+function renderXpBar(character) {
+  const level = character.level || 1;
+  const maxLevel = character.maxLevel || 50;
+  const atMax = level >= maxLevel;
+  const need = character.xpForNext || 0;
+  const have = atMax ? 0 : Math.max(0, character.xp || 0);
+  const pct = atMax ? 100 : need ? Math.min(100, (have / need) * 100) : 0;
+
+  const meta = document.createElement('div');
+  meta.className = 'xp-meta';
+  const lvl = document.createElement('span');
+  lvl.className = 'xp-lvl';
+  lvl.textContent = `Level ${level}`;
+  const num = document.createElement('span');
+  num.className = 'xp-num';
+  num.textContent = atMax ? 'Max level' : `${have} / ${need} XP`;
+  meta.append(lvl, num);
+
+  const track = document.createElement('div');
+  track.className = 'xp-track';
+  const fill = document.createElement('div');
+  fill.className = 'xp-fill';
+  fill.style.width = `${pct}%`;
+  track.append(fill);
+
+  xpBarEl.replaceChildren(meta, track);
+  xpBarEl.hidden = false;
 }
 
 // ---- Equipment (Character tab) -----------------------------------------
@@ -1373,8 +1405,23 @@ socket.on('duel:round', ({ view }) => {
   pendingCard = null; // new round, fresh pick
   renderDuel();
 });
-socket.on('duel:end', ({ view }) => {
+socket.on('duel:end', async ({ view, reward }) => {
   duelState = view;
+  if (reward) {
+    duelState.reward = reward;
+    // A world-map win can change level (and therefore stats) — pull a fresh sheet.
+    try {
+      const me = await fetch('/api/me').then((r) => r.json());
+      if (me.user && me.user.character) {
+        currentUser.character = me.user.character;
+        levelInput.value = me.user.character.level;
+        renderSheet(me.user.character);
+        renderEquipment(me.user.character);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
   renderDuel();
 });
 socket.on('duel:error', ({ error }) => {
@@ -1693,11 +1740,28 @@ function renderAction() {
     const reason = { hp: '', left: ' (opponent left)', rounds: ' (by HP after 15 rounds)' }[v.endReason] || '';
     const h = document.createElement('h3');
     h.textContent = result + reason;
+    duelActionEl.append(h);
+
+    if (v.reward) {
+      const xp = document.createElement('p');
+      xp.className = 'duel-reward';
+      xp.textContent = `+${v.reward.xp} XP`;
+      duelActionEl.append(xp);
+      if (v.reward.levelsGained > 0) {
+        const lu = document.createElement('p');
+        lu.className = 'duel-reward levelup';
+        lu.textContent = v.reward.levelsGained === 1
+          ? `Level up! You are now level ${v.reward.level}.`
+          : `Level up! You gained ${v.reward.levelsGained} levels — now level ${v.reward.level}.`;
+        duelActionEl.append(lu);
+      }
+    }
+
     const back = document.createElement('button');
     back.className = 'btn discord';
     back.textContent = 'Back to lobby';
     back.addEventListener('click', backToLobby);
-    duelActionEl.append(h, back);
+    duelActionEl.append(back);
     return;
   }
 

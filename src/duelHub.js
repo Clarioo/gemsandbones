@@ -31,14 +31,16 @@ const duelBot = require('./duelBot');
 const { isDuelLegal, defaultDeckForClass } = require('./deck');
 const { CLASSES } = require('./classes');
 const { equippedItemMods, rollEnemyLoadout } = require('./items');
+const { xpForEnemyKill } = require('./leveling');
 
-function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
+function createDuelHub(io, { getUserById, wearEquipped = () => {}, addCharacterXp = () => null }) {
   const queue = []; // userIds waiting
   const sockets = new Map(); // userId -> socket
   const duels = new Map(); // duelId -> duel
   const userDuel = new Map(); // userId -> duelId
   const timers = new Map(); // duelId -> timeout handle
   const botDuels = new Map(); // duelId -> bot userId (practice duels)
+  const mapDuels = new Map(); // duelId -> { userId, enemyLevel, playerLevel } (world-map fights: winning grants XP)
 
   const socketOf = (userId) => sockets.get(userId);
 
@@ -64,12 +66,35 @@ function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
     );
   }
 
+  /**
+   * A duel ended: hand out any world-map XP (once) and return a per-user map of
+   * reward payloads to attach to the `end` view. Non-map duels return {}.
+   */
+  function settleDuel(duel) {
+    const meta = mapDuels.get(duel.id);
+    if (!meta) return {};
+    mapDuels.delete(duel.id); // award exactly once
+    if (duel.winner !== meta.userId) return {};
+    const res = addCharacterXp(meta.userId, xpForEnemyKill(meta.enemyLevel, meta.playerLevel));
+    if (!res) return {};
+    return {
+      [meta.userId]: {
+        xp: res.awarded,
+        levelsGained: res.levelsGained,
+        level: res.level,
+        xpInLevel: res.xp,
+        xpForNext: res.xpForNext,
+      },
+    };
+  }
+
   function resolveAndAdvance(duel, extra = {}) {
     clearDuelTimer(duel);
     const entry = duelEngine.resolveRound(duel);
     if (duel.phase === 'ended') {
+      const rewards = settleDuel(duel);
       sendViews(duel, 'round', () => ({ entry, ...extra }));
-      sendViews(duel, 'end');
+      sendViews(duel, 'end', (uid) => (rewards[uid] ? { reward: rewards[uid] } : {}));
       cleanupDuel(duel);
     } else {
       armDuelTimer(duel); // set the next deadline before broadcasting
@@ -167,6 +192,7 @@ function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
     clearDuelTimer(duel);
     for (const uid of duel.order) userDuel.delete(uid);
     botDuels.delete(duel.id);
+    mapDuels.delete(duel.id);
     duels.delete(duel.id);
   }
 
@@ -184,7 +210,8 @@ function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
     const duel = duelOf(userId);
     if (!duel || duel.phase === 'ended') return;
     duelEngine.forfeit(duel, userId);
-    sendViews(duel, 'end');
+    const rewards = settleDuel(duel); // no XP for the leaver; a map opponent could still be owed one
+    sendViews(duel, 'end', (uid) => (rewards[uid] ? { reward: rewards[uid] } : {}));
     cleanupDuel(duel);
   }
 
@@ -231,6 +258,9 @@ function createDuelHub(io, { getUserById, wearEquipped = () => {} }) {
     duels.set(id, duel);
     userDuel.set(userId, id);
     botDuels.set(id, bot.userId);
+    if (opts.source === 'map') {
+      mapDuels.set(id, { userId, enemyLevel: botLevel, playerLevel: c.character.level || 1 });
+    }
     wearEquipped(userId);
     armDuelTimer(duel);
     sendViews(duel, 'start');
