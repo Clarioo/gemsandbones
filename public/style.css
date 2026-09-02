@@ -212,6 +212,31 @@ h1 {
 }
 .level-note { margin: 6px 0 0; }
 
+/* Level + XP progress, under the sheet title. */
+.xp-bar { margin: 10px 0 2px; }
+.xp-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.xp-meta .xp-lvl { color: var(--text); font-weight: 700; }
+.xp-meta .xp-num { color: var(--faint); }
+.xp-track {
+  height: 6px;
+  background: var(--panel-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--t-special), var(--accent));
+  transition: width 0.4s ease;
+}
+
 .dev-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dev-tools .btn { padding: 6px 12px; font-size: 0.85rem; }
 .dev-tag {
@@ -1028,6 +1053,8 @@ button.gcard:hover:not(:disabled) { border-color: var(--c); }
 
 .duel-action { margin-top: 14px; }
 .duel-action h3 { margin: 0 0 10px; font-family: var(--font-display); font-weight: 600; }
+.duel-reward { margin: 0 0 8px; font-weight: 700; color: var(--t-special); font-variant-numeric: tabular-nums; }
+.duel-reward.levelup { color: var(--good); }
 
 .hand {
   display: flex;

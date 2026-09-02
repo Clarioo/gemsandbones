@@ -68,6 +68,7 @@ function createLocationHub(io, { getUserById, setCharacterLocation, startBotDuel
         level: enemy.level,
         botClassId: enemy.classId,
         botName: enemy.name,
+        source: 'map', // beating a map enemy grants XP; practice bots do not
       });
       if (!r.ok) socket.emit('location:error', { error: r.error });
     });

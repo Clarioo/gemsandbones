@@ -16,6 +16,7 @@ const crypto = require('crypto');
 
 const { deckIsLegal, defaultDeckForClass } = require('./deck');
 const { SLOTS, BAG_MAX, itemUsableByClass } = require('./items');
+const { applyXp } = require('./leveling');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
 
@@ -81,8 +82,9 @@ function ensureCharacter(user) {
     };
   }
   const c = user.character;
-  // Backfill for characters created before `level` existed.
+  // Backfill for characters created before `level` / `xp` existed.
   if (typeof c.level !== 'number') c.level = 1;
+  if (typeof c.xp !== 'number') c.xp = 0;
   // Backfill equipment (added later).
   if (!Array.isArray(c.bag)) c.bag = [];
   if (!c.equipment || typeof c.equipment !== 'object') c.equipment = {};
@@ -145,7 +147,7 @@ function setCharacterName(userId, name) {
   return character;
 }
 
-/** Set the character's level. Returns the character, or null. */
+/** Set the character's level. Dev tool — also clears XP progress. Returns the character, or null. */
 function setCharacterLevel(userId, level) {
   const data = load();
   const user = data.users.find((u) => u.id === userId);
@@ -153,8 +155,35 @@ function setCharacterLevel(userId, level) {
 
   const character = ensureCharacter(user);
   character.level = level;
+  character.xp = 0;
   save(data);
   return character;
+}
+
+/**
+ * Award XP to a character (world-map kills only — see leveling.js). Applies any
+ * level-ups. Returns { character, awarded, levelsGained, level, xp, xpForNext }
+ * or null if the user is unknown.
+ */
+function addCharacterXp(userId, amount) {
+  const data = load();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) return null;
+
+  const character = ensureCharacter(user);
+  const awarded = Math.max(0, Math.round(amount || 0));
+  const res = applyXp({ level: character.level, xp: character.xp }, awarded);
+  character.level = res.level;
+  character.xp = res.xp;
+  save(data);
+  return {
+    character,
+    awarded,
+    levelsGained: res.levelsGained,
+    level: res.level,
+    xp: res.xp,
+    xpForNext: res.xpForNext,
+  };
 }
 
 /**
@@ -254,6 +283,7 @@ module.exports = {
   setCharacterClass,
   setCharacterName,
   setCharacterLevel,
+  addCharacterXp,
   setCharacterLocation,
   setDeck,
   addItemToBag,
