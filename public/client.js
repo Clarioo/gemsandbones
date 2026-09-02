@@ -1039,7 +1039,7 @@ function renderEquipment(character) {
       const name = document.createElement('div');
       name.className = 'es-name';
       name.textContent = item.name;
-      el.append(name, itemStatList(item), durabilityBar(item));
+      el.append(name, itemArt(item.slot), itemStatList(item), durabilityBar(item));
       el.append(miniButton('Unequip', () =>
         equipmentAction('/api/equipment/unequip', { slot })));
     } else {
